@@ -1,0 +1,28 @@
+{
+  "name": "somnia-ai-agents-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for NFT-gated AI agents on Somnia L1",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:somnia": "hardhat run scripts/deploy.js --network somnia",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "verify": "hardhat verify --network somnia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^5.0.1",
+    "hardhat": "^2.19.0",
+    "dotenv": "^16.3.1"
+  },
+  "keywords": [
+    "somnia",
+    "nft",
+    "ai",
+    "provenance",
+    "verifiable"
+  ],
+  "author": "",
+  "license": "MIT",
+  "main": "hardhat.config.js"
+}

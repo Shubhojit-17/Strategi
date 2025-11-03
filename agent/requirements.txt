@@ -1,0 +1,34 @@
+fastapi[all]==0.109.0
+uvicorn[standard]==0.27.0
+web3==6.15.1
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# IPFS
+pinatapy-vourhey==0.1.5
+ipfshttpclient==0.8.0a2
+
+# AI/ML
+openai==1.10.0
+google-generativeai==0.8.5
+pypdf2==3.0.1
+
+# Uncomment for local inference:
+# vllm==0.2.7
+# transformers==4.36.0
+# torch==2.1.0
+
+# Verifiable credentials
+# Note: DIDKit requires Docker or compilation
+# See: https://github.com/spruceid/didkit
+# For now, we'll implement DID operations manually
+
+# Crypto
+cryptography==42.0.0
+coincurve==19.0.1
+
+# Utils
+httpx==0.26.0
+aiofiles==23.2.1
+python-multipart==0.0.6

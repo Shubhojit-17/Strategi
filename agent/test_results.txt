@@ -1,0 +1,106 @@
+﻿
+[OK] All required environment variables found
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-8.4.2, pluggy-1.6.0 -- D:\strategi\agent\venv_new\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\strategi\agent
+plugins: anyio-4.11.0, asyncio-1.2.0, cov-7.0.0, web3-6.15.1
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_end_to_end.py::test_complete_workflow_live 
+================================================================================
+≡ƒÜÇ STARTING END-TO-END LIVE SYSTEM TEST
+================================================================================
+
+≡ƒôï STEP 1: Verifying agent registration on Somnia...
+   Agent DID: did:key:z6Mku4xTanSL1Dr2ZZLtiiRE6ziSv6Ls9hwLb5LzHF856WDc
+   Agent Address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+   Registered: True
+Γ£à STEP 1 PASSED: Agent is registered on Somnia
+
+≡ƒôñ STEP 2: Uploading document to Pinata IPFS...
+FAILED
+
+================================== FAILURES ===================================
+_________________________ test_complete_workflow_live _________________________
+
+    @pytest.mark.asyncio
+    async def test_complete_workflow_live():
+        """
+        Complete E2E test with LIVE services:
+        1. Check agent registration on Somnia Γ£ô
+        2. Upload document to Pinata IPFS Γ£ô
+        3. Create Crossmint wallet Γ£ô
+        4. Mint NFT on Somnia (backend mints to Crossmint address) Γ£ô
+        5. Execute AI with Moonshot Γ£ô
+        6. Record provenance on Somnia Γ£ô
+        7. Verify execution (Merkle tree verification) Γ£ô
+        8. Retrieve trace from IPFS Γ£ô
+    
+        This is the REAL end-to-end workflow with no simulations.
+        """
+    
+        print("\n" + "="*80)
+        print("≡ƒÜÇ STARTING END-TO-END LIVE SYSTEM TEST")
+        print("="*80)
+    
+        async with AsyncClient(base_url=API_BASE_URL, timeout=TIMEOUT) as client:
+    
+            # ========== STEP 1: Check Agent Registration ==========
+            print("\n≡ƒôï STEP 1: Verifying agent registration on Somnia...")
+    
+            info_response = await client.get("/agent/info")
+            assert info_response.status_code == 200
+    
+            agent_info = info_response.json()
+            print(f"   Agent DID: {agent_info['did']}")
+            print(f"   Agent Address: {agent_info['address']}")
+            print(f"   Registered: {agent_info['is_registered']}")
+    
+            assert agent_info['is_registered'] == True, "Γ¥î Agent not registered! Run registration first."
+            print("Γ£à STEP 1 PASSED: Agent is registered on Somnia")
+    
+            # ========== STEP 2: Upload Document to IPFS ==========
+            print("\n≡ƒôñ STEP 2: Uploading document to Pinata IPFS...")
+    
+            # Create test document
+            test_content = """
+            BLOCKCHAIN AND AI INTEGRATION
+    
+            This is a test document for the Somnia AI Agents platform.
+    
+            Key Points:
+            1. NFT-gated access to documents
+            2. AI agents process documents with verifiable execution
+            3. Provenance is recorded on Somnia blockchain
+            4. Anyone can verify the AI's work via Merkle proofs
+    
+            This demonstrates the integration of:
+            - IPFS for decentralized storage
+            - Somnia L1 for blockchain anchoring
+            - Moonshot AI for language processing
+            - Crossmint for wallet-as-a-service
+    
+            End of test document.
+            """
+    
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+                f.write(test_content)
+                temp_path = f.name
+    
+            try:
+                with open(temp_path, 'rb') as f:
+                    upload_response = await client.post(
+                        "/documents/upload",
+                        files={"file": ("e2e-test-doc.txt", f, "text/plain")}
+                    )
+    
+>               assert upload_response.status_code == 200
+E               assert 500 == 200
+E                +  where 500 = <Response [500 Internal Server Error]>.status_code
+
+tests\test_end_to_end.py:85: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_end_to_end.py::test_complete_workflow_live - assert 500 == 200
+============================== 1 failed in 1.47s ==============================
