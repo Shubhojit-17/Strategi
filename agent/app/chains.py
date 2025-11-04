@@ -6,12 +6,15 @@ Handles contract calls and transactions
 import os
 import json
 import logging
+import random
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
 from web3 import Web3
 from web3.contract import Contract
 from eth_account import Account
+
+from app.database import DocumentDatabase
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +45,16 @@ class SomniaClient:
         self.access_nft_address = access_nft_address or os.getenv("ACCESS_NFT_ADDRESS")
         self.agent_registry_address = agent_registry_address or os.getenv("AGENT_REGISTRY_ADDRESS")
         self.provenance_address = provenance_address or os.getenv("PROVENANCE_ADDRESS")
+        self.company_dropbox_address = os.getenv("COMPANY_DROPBOX_ADDRESS")
         
         # Load contracts
         self.access_nft = self._load_contract("AccessNFT", self.access_nft_address)
         self.agent_registry = self._load_contract("AgentRegistry", self.agent_registry_address)
         self.provenance = self._load_contract("Provenance", self.provenance_address)
+        self.company_dropbox = self._load_company_dropbox_contract()
+        
+        # Initialize database for document caching
+        self.db = DocumentDatabase()
     
     def _load_contract(self, name: str, address: Optional[str]) -> Optional[Contract]:
         """Load contract from ABI"""
@@ -68,6 +76,23 @@ class SomniaClient:
             address=Web3.to_checksum_address(address),
             abi=abi
         )
+    
+    def _load_company_dropbox_contract(self):
+        """Load CompanyDropbox contract using contract_config"""
+        try:
+            from .contract_config import get_contract_address, get_contract_abi
+            
+            address = get_contract_address("company_dropbox") or self.company_dropbox_address
+            if not address:
+                logger.warning("No CompanyDropbox contract address configured")
+                return None
+            
+            abi = get_contract_abi("company_dropbox")
+            logger.info(f"Loading CompanyDropbox contract at {address}")
+            return self.w3.eth.contract(address=self.w3.to_checksum_address(address), abi=abi)
+        except Exception as e:
+            logger.error(f"Failed to load CompanyDropbox contract: {e}")
+            return None
     
     async def check_nft_ownership(self, token_id: int, user_address: str) -> bool:
         """Check if user owns a specific NFT"""
@@ -134,7 +159,7 @@ class SomniaClient:
         
         # Sign and send
         signed = self.account.sign_transaction(tx)
-        tx_hash = self.w3.eth.send_raw_transaction(signed.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
         logger.info(f"Transaction sent: {tx_hash.hex()}")
         
         # Wait for confirmation
@@ -315,6 +340,291 @@ class SomniaClient:
             "proofCID": record[9],
             "verified": record[10]
         }
+    
+    async def record_document_on_chain(
+        self,
+        cid: str,
+        document_hash: str,
+        filename: str,
+        file_size: int,
+        token_id: int
+    ) -> Dict[str, Any]:
+        """
+        Record document upload on CompanyDropbox contract
+        
+        Args:
+            cid: IPFS content identifier
+            document_hash: SHA256 hash of document
+            filename: Original filename
+            file_size: File size in bytes
+            token_id: NFT token ID for authentication
+            
+        Returns:
+            Dictionary with transaction details and document_id
+        """
+        if not self.company_dropbox:
+            raise ValueError("CompanyDropbox contract not loaded")
+        
+        if not self.account:
+            raise ValueError("No account configured")
+        
+        logger.info(f"Recording document on chain: {filename} (CID: {cid})")
+        
+        # Convert document hash string to bytes32
+        if isinstance(document_hash, str):
+            # Remove '0x' prefix if present
+            hash_hex = document_hash.replace('0x', '')
+            # Convert hex string to bytes32
+            document_hash_bytes = bytes.fromhex(hash_hex)
+        else:
+            document_hash_bytes = document_hash
+        
+        # Estimate gas first
+        try:
+            gas_estimate = self.company_dropbox.functions.uploadDocument(
+                cid,
+                document_hash_bytes,
+                filename,
+                file_size
+            ).estimate_gas({'from': self.account.address})
+            
+            # Add 50% buffer to gas estimate
+            gas_limit = int(gas_estimate * 1.5)
+            logger.info(f"Gas estimate: {gas_estimate}, using limit: {gas_limit}")
+        except Exception as e:
+            logger.error(f"Gas estimation failed: {e}")
+            raise
+        
+        # Build transaction
+        tx = self.company_dropbox.functions.uploadDocument(
+            cid,
+            document_hash_bytes,
+            filename,
+            file_size
+        ).build_transaction({
+            'from': self.account.address,
+            'nonce': self.w3.eth.get_transaction_count(self.account.address),
+            'gas': gas_limit,
+        })
+        
+        # Sign and send
+        signed_tx = self.account.sign_transaction(tx)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+        
+        logger.info(f"Transaction sent: {tx_hash.hex()}")
+        
+        # Wait for receipt
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        
+        if receipt['status'] != 1:
+            logger.error("Transaction failed")
+            raise Exception("Document recording transaction failed")
+        
+        # Parse DocumentUploaded event to get document_id
+        document_id = None
+        for log in receipt['logs']:
+            try:
+                event = self.company_dropbox.events.DocumentUploaded().process_log(log)
+                document_id = event['args']['documentId']
+                logger.info(f"Document recorded with ID: {document_id}")
+                break
+            except:
+                continue
+        
+        return {
+            "tx_hash": tx_hash.hex(),
+            "block_number": receipt['blockNumber'],
+            "gas_used": receipt['gasUsed'],
+            "document_id": document_id,
+            "cid": cid,
+            "filename": filename
+        }
+    
+    def verify_document_on_chain(self, tx_hash: str, expected_block: int, expected_data: Dict[str, Any]) -> bool:
+        """
+        Verify a cached document exists on blockchain with matching data
+        Used to detect cache tampering
+        
+        Args:
+            tx_hash: Transaction hash from cache
+            expected_block: Block number from cache
+            expected_data: Document data from cache (ipfs_hash, document_hash, etc.)
+            
+        Returns:
+            True if document verified on chain, False if tampered
+        """
+        try:
+            # Get transaction receipt from blockchain
+            receipt = self.w3.eth.get_transaction_receipt(tx_hash)
+            
+            # Verify block number matches
+            if receipt['blockNumber'] != expected_block:
+                logger.warning(f"Block mismatch for tx {tx_hash}: expected {expected_block}, got {receipt['blockNumber']}")
+                return False
+            
+            # Verify transaction succeeded
+            if receipt['status'] != 1:
+                logger.warning(f"Transaction {tx_hash} failed on chain")
+                return False
+            
+            # Verify event exists in logs
+            event_signature = self.w3.keccak(text="DocumentUploaded(uint256,address,uint256,string,bytes32,string)").hex()
+            
+            for log in receipt['logs']:
+                try:
+                    if log['topics'][0].hex() == event_signature:
+                        # Parse event data
+                        decoded = self.company_dropbox.events.DocumentUploaded().process_log(log)
+                        args = decoded['args']
+                        
+                        # Verify document data matches cache
+                        if (args['ipfsHash'] == expected_data.get('ipfs_hash') and
+                            args['documentHash'].hex() if isinstance(args['documentHash'], bytes) else args['documentHash'] == expected_data.get('document_hash') and
+                            args['fileName'] == expected_data.get('filename')):
+                            logger.debug(f"Document verified: tx {tx_hash}")
+                            return True
+                        else:
+                            logger.warning(f"Document data mismatch for tx {tx_hash}")
+                            return False
+                except Exception as e:
+                    # Not our event or parsing error
+                    continue
+            
+            logger.warning(f"DocumentUploaded event not found in tx {tx_hash}")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error verifying document on chain: {e}")
+            return False
+    
+    async def get_user_documents(self, user_address: str) -> list[Dict[str, Any]]:
+        """
+        Get all documents uploaded by a user using hybrid cache approach:
+        1. Check SQLite cache first
+        2. Verify random 10% sample against blockchain
+        3. Query only new blocks since last sync
+        4. Update cache with new documents
+        
+        Args:
+            user_address: Ethereum address of the user
+            
+        Returns:
+            List of document records with metadata
+        """
+        if not self.company_dropbox:
+            raise ValueError("CompanyDropbox contract not loaded")
+        
+        logger.info(f"Fetching documents for user: {user_address}")
+        
+        try:
+            # Step 1: Check cache first
+            cached_docs = self.db.get_user_documents(user_address)
+            logger.info(f"Cache hit: {len(cached_docs)} documents")
+            
+            # Step 2: Random verification (10% sample) to detect tampering
+            if cached_docs:
+                verification_rate = float(os.getenv("CACHE_VERIFICATION_RATE", "0.1"))
+                sample_size = max(1, int(len(cached_docs) * verification_rate))
+                sample_docs = random.sample(cached_docs, sample_size)
+                
+                logger.info(f"Verifying {len(sample_docs)}/{len(cached_docs)} documents")
+                
+                for doc in sample_docs:
+                    is_valid = self.verify_document_on_chain(
+                        doc['tx_hash'],
+                        doc['block_number'],
+                        doc
+                    )
+                    
+                    if not is_valid:
+                        logger.warning(f"Cache tampered! Document {doc['document_id']} failed verification. Clearing cache.")
+                        self.db.clear_user_cache(user_address)
+                        cached_docs = []
+                        break
+                else:
+                    logger.info(f"Verified {len(sample_docs)}/{len(cached_docs)} documents - all valid")
+            
+            # Step 3: Incremental sync - query only new blocks
+            current_block = self.w3.eth.block_number
+            logger.info(f"Current block: {current_block}")
+            
+            # Get last synced block, default to deployment block
+            DEPLOYMENT_BLOCK = int(os.getenv("COMPANY_DROPBOX_DEPLOYMENT_BLOCK", "219187000"))
+            last_synced_block = self.db.get_last_synced_block(user_address)
+            from_block = last_synced_block + 1 if last_synced_block else DEPLOYMENT_BLOCK
+            
+            # Only query if there are new blocks
+            new_documents = []
+            if current_block >= from_block:
+                logger.info(f"Syncing blocks {from_block} to {current_block} ({current_block - from_block + 1} blocks)")
+                
+                # Query in batches to avoid Somnia's 1000 block limit
+                BATCH_SIZE = int(os.getenv("BLOCKCHAIN_QUERY_BATCH_SIZE", "500"))
+                
+                for batch_start in range(from_block, current_block + 1, BATCH_SIZE):
+                    batch_end = min(batch_start + BATCH_SIZE - 1, current_block)
+                    
+                    try:
+                        event_filter = self.company_dropbox.events.DocumentUploaded.create_filter(
+                            from_block=batch_start,
+                            to_block=batch_end,
+                            argument_filters={'uploader': user_address}
+                        )
+                        
+                        batch_events = event_filter.get_all_entries()
+                        
+                        if batch_events:
+                            logger.info(f"Found {len(batch_events)} new events in batch {batch_start}-{batch_end}")
+                            
+                            # Process new events
+                            for event in batch_events:
+                                args = event['args']
+                                
+                                # Get block timestamp
+                                block = self.w3.eth.get_block(event['blockNumber'])
+                                
+                                doc = {
+                                    "user_address": user_address,
+                                    "document_id": args['documentId'],
+                                    "filename": args['fileName'],
+                                    "ipfs_hash": args['ipfsHash'],
+                                    "document_hash": args['documentHash'].hex() if isinstance(args['documentHash'], bytes) else args['documentHash'],
+                                    "token_id": args['tokenId'],
+                                    "timestamp": block['timestamp'],
+                                    "tx_hash": event['transactionHash'].hex(),
+                                    "block_number": event['blockNumber']
+                                }
+                                new_documents.append(doc)
+                                
+                    except Exception as batch_error:
+                        logger.warning(f"Error in batch {batch_start}-{batch_end}: {batch_error}")
+                        continue
+                
+                # Step 4: Update cache with new documents
+                if new_documents:
+                    self.db.insert_documents_batch(new_documents)
+                    logger.info(f"Cached {len(new_documents)} new documents")
+                    
+                # Update sync status
+                self.db.update_sync_status(user_address, current_block)
+                logger.info(f"Updated sync status to block {current_block}")
+            else:
+                logger.info("No new blocks to sync")
+            
+            # Step 5: Combine cached and new documents
+            all_documents = cached_docs + new_documents
+            
+            # Sort by timestamp descending (most recent first)
+            all_documents.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+            logger.info(f"Returning {len(all_documents)} total documents ({len(cached_docs)} cached, {len(new_documents)} new)")
+            
+            return all_documents
+            
+        except Exception as e:
+            logger.error(f"Error fetching documents: {e}")
+            # Return empty list instead of raising error - graceful handling for no documents
+            return []
 
 
 # ============ Example Usage ============

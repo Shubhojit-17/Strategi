@@ -238,7 +238,7 @@ export default function AIExecution() {
               <p className="text-sm text-gray-300">Execution Root: {result.execution_root}</p>
               <p className="text-sm text-gray-300">Trace CID: {result.trace_cid}</p>
               <a
-                href={`https://explorer.somnia.network/tx/${result.tx_hash}`}
+                href={`https://explorer.somnia.network/tx/${result.tx_hash.replace(/^0x/, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300 hover:underline text-sm"

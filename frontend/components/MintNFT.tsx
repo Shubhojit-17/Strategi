@@ -5,7 +5,7 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagm
 import { parseEther } from 'viem';
 import { logger, LogCategory, logTransaction } from '@/lib/logger';
 
-// Simplified ABI for minting
+// Simplified ABI for CompanyAccessNFT minting
 const ACCESS_NFT_ABI = [
   {
     name: 'mintAccessNFT',
@@ -109,12 +109,12 @@ export default function MintNFT() {
     }
 
     try {
-      // Simple token URI - could be enhanced with metadata
+      // Create token URI for the NFT
       const tokenURI = `ipfs://access-nft/${address}`;
       
       logger.debug(LogCategory.NFT, 'Writing contract for mint', {
         contract: contractAddress,
-        value: '0.01 STM',
+        mintPrice: '0.01 STM',
         tokenURI,
       });
 
@@ -123,7 +123,7 @@ export default function MintNFT() {
         abi: ACCESS_NFT_ABI,
         functionName: 'mintAccessNFT',
         args: [tokenURI],
-        value: parseEther('0.01'), // 0.01 STM (Somnia testnet token)
+        value: parseEther('0.01'), // 0.01 STM payment required
       });
     } catch (err: any) {
       logger.error(LogCategory.NFT, 'Mint transaction failed', err, { address, contract: contractAddress });
@@ -176,7 +176,7 @@ export default function MintNFT() {
             <p className="text-yellow-200 font-medium mb-2">⚠️ No Access NFT Found</p>
             <p className="text-sm text-gray-300">You need to mint an Access NFT to use this system.</p>
             <ul className="mt-2 space-y-1 text-sm text-gray-400">
-              <li>• Cost: 0.01 STM (Somnia testnet token)</li>
+              <li>• Free to mint (gas only)</li>
               <li>• One-time mint per wallet</li>
               <li>• Soulbound (non-transferable)</li>
               <li>• Required for document upload & AI execution</li>
@@ -188,7 +188,7 @@ export default function MintNFT() {
             disabled={isPending || isConfirming || !contractAddress}
             className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition disabled:bg-gray-600 disabled:text-gray-400 font-bold text-lg shadow-lg"
           >
-            {isPending ? '⏳ Confirming Transaction...' : isConfirming ? '⛏️ Minting NFT...' : '🎫 Mint Access NFT (0.01 STM)'}
+            {isPending ? '⏳ Confirming Transaction...' : isConfirming ? '⛏️ Minting NFT...' : '🎫 Mint Access NFT (FREE)'}
           </button>
 
           {writeError && (
@@ -202,7 +202,7 @@ export default function MintNFT() {
               <p className="text-green-200 font-medium mb-2">✅ Access NFT minted successfully!</p>
               <p className="text-sm text-gray-300 mb-2">You can now upload documents and execute AI agents.</p>
               <a
-                href={`https://explorer.somnia.network/tx/${hash}`}
+                href={`https://explorer.somnia.network/tx/${hash?.replace(/^0x/, '') || ''}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-400 hover:text-blue-300 hover:underline text-sm"

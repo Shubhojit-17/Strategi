@@ -211,7 +211,10 @@ class VerifiableAgent:
             timestamp=int(time.time())
         )
         
-        return self.input_commitment.compute_root()
+        root = self.input_commitment.compute_root()
+        print(f"🔍 Input root computed: {root}")
+        print(f"🔍 Input data: doc_cid={document_cid}, chunks={len(chunks)}, metadata keys={list((metadata or {}).keys())}")
+        return root
     
     def log_step(self, step_type: str, data: Dict[str, Any]):
         """Log an execution step"""
@@ -230,15 +233,21 @@ class VerifiableAgent:
             executionRoot (hex string)
         """
         if not self.execution_steps:
-            return Web3.keccak(text="empty").hex()
+            empty_root = Web3.keccak(text="empty").hex()
+            print(f"⚠️ No execution steps! Returning empty root: {empty_root}")
+            return empty_root
         
         # Hash each step
         leaves = [step.hash() for step in self.execution_steps]
+        print(f"🔍 Computing execution root from {len(leaves)} steps")
+        print(f"🔍 First leaf hash: {leaves[0] if leaves else 'none'}")
         
         # Build Merkle tree
         tree = MerkleTree(leaves)
+        root = tree.root
+        print(f"🔍 Execution root computed: {root}")
         
-        return tree.root
+        return root
     
     def get_execution_trace(self) -> Dict[str, Any]:
         """

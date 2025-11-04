@@ -34,7 +34,7 @@ class NFTAuthenticator:
         if not self.access_nft_address:
             raise ValueError("ACCESS_NFT_ADDRESS not set in environment")
         
-        # CompanyAccessNFT ABI
+        # CompanyAccessNFT ABI - Custom NFT with authentication functions
         self.access_nft_abi = [
             {
                 "inputs": [{"internalType": "address", "name": "user", "type": "address"}],
@@ -51,10 +51,10 @@ class NFTAuthenticator:
                 "type": "function"
             },
             {
-                "inputs": [{"internalType": "address", "name": "", "type": "address"}],
-                "name": "hasNFT",
-                "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-                "stateMutability": "view",
+                "inputs": [],
+                "name": "mintAccessNFT",
+                "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "stateMutability": "payable",
                 "type": "function"
             }
         ]

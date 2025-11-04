@@ -1,0 +1,192 @@
+# Frontend-Backend Integration Requirements
+
+## Overview
+The frontend is a Next.js application that provides a user interface for interacting with a decentralized AI agent system built on Somnia L1 blockchain. The backend is a FastAPI server that handles NFT authentication, IPFS storage, AI execution, and blockchain interactions.
+
+## Current Frontend Functionalities
+
+### 1. Wallet Connection (UnifiedWalletConnect Component)
+- **MetaMask Integration**: Connect to Ethereum-compatible wallets
+- **Crossmint Integration**: Email-based wallet creation and management
+- **Network Switching**: Automatic switching to Somnia testnet (Chain ID: 50312)
+- **Connection Persistence**: Store Crossmint wallet info in localStorage
+
+### 2. NFT Minting (MintNFT Component)
+- **Access NFT Minting**: Mint CompanyAccessNFT tokens for authentication
+- **Cost**: 0.01 STM (Somnia token)
+- **Authentication Check**: Verify if user already owns NFT
+- **Transaction Monitoring**: Track minting transaction status
+
+### 3. Document Upload (DocumentUpload Component)
+- **File Upload**: Support for various file types (PDF, text, etc.)
+- **NFT Authentication**: Require NFT ownership before upload
+- **IPFS Storage**: Upload files to IPFS via Pinata
+- **Blockchain Recording**: Record document metadata on Somnia blockchain
+- **Progress Tracking**: Show upload progress and status
+
+### 4. Document Management (DocumentList Component)
+- **Document Listing**: Display all user-uploaded documents
+- **Metadata Display**: Show filename, IPFS hash, file size, timestamps
+- **Gateway Links**: Provide IPFS gateway URLs for document access
+- **Blockchain Verification**: Show transaction hashes and block numbers
+
+### 5. AI Execution (AIExecution Component)
+- **Multi-Provider Support**: Gemini, Moonshot, DeepSeek, Mistral
+- **Model Selection**: Different models per provider
+- **Document Analysis**: Execute AI prompts on uploaded documents
+- **Provenance Tracking**: Record execution on blockchain
+- **Result Display**: Show AI responses and execution metadata
+
+## Backend API Requirements
+
+### Core Endpoints
+
+#### Health & Agent Management
+- `GET /` - Health check endpoint
+- `GET /agent/info` - Retrieve agent DID, name, registration status
+- `POST /agent/register` - Register agent on Somnia AgentRegistry
+
+#### Authentication & Authorization
+- `GET /auth/check?user_address={address}` - Check NFT ownership status
+  - Returns: `{authenticated: boolean, token_id: number, message: string}`
+
+#### Document Management
+- `POST /documents/upload` - Upload document to IPFS
+  - Requires: `file` (FormData), `user_address` (FormData)
+  - Returns: `{success: boolean, cid: string, filename: string, document_hash: string, token_id: number, gateway_url: string}`
+  - Requires NFT authentication
+
+- `GET /documents/list?user_address={address}` - List user's documents
+  - Returns: `{user_address: string, token_id: number, documents: [...], count: number}`
+  - Requires NFT authentication
+
+#### AI Execution
+- `POST /execute` - Execute AI on document
+  - Body: `{nft_token_id: number, user_address: string, document_cid: string, prompt: string, provider: string, model: string}`
+  - Returns: `{record_id: number, output_cid: string, execution_root: string, trace_cid: string, tx_hash: string, output_text: string}`
+  - Requires NFT ownership verification
+
+#### Provenance & Verification
+- `GET /provenance/nft/{token_id}` - Get provenance records for NFT
+- `GET /provenance/trace/{cid}` - Fetch execution trace from IPFS
+- `GET /provenance/verify/{record_id}` - Verify execution provenance
+
+#### Crossmint Integration
+- `POST /crossmint/wallet` - Create/retrieve Crossmint wallet
+  - Body: `{email: string}`
+  - Returns: `{walletAddress: string, email: string, isNew: boolean}`
+
+- `POST /crossmint/mint` - Mint NFT for Crossmint user
+  - Body: `{email: string, document_cid: string}`
+  - Returns: `{success: boolean, token_id: number, wallet_address: string, tx_hash: string}`
+
+#### Logging
+- `POST /logs/frontend` - Receive frontend logs for monitoring
+  - Body: `{timestamp: string, level: string, category: string, action: string, details: object, userAddress: string, txHash: string, error: any}`
+
+## Frontend-Backend Communication Requirements
+
+### HTTP Client Setup
+- Base URL: Configurable via `NEXT_PUBLIC_BACKEND_URL` environment variable
+- Default: `http://localhost:8000`
+- CORS: Backend must allow frontend origin
+- Error Handling: Proper error responses with meaningful messages
+
+### Authentication Flow
+1. User connects wallet (MetaMask or Crossmint)
+2. Frontend checks NFT ownership via `/auth/check`
+3. If no NFT, prompt user to mint via MintNFT component
+4. All document operations require NFT authentication
+5. AI execution requires NFT ownership verification
+
+### State Management Requirements
+- Wallet connection state (MetaMask vs Crossmint)
+- NFT ownership status
+- Document list caching
+- AI execution results
+- Transaction status tracking
+
+### Error Handling Requirements
+- Network errors (backend unreachable)
+- Authentication errors (missing NFT)
+- Transaction failures
+- Rate limiting (AI provider limits)
+- Invalid input validation
+
+### UI/UX Requirements
+- Loading states for all async operations
+- Error messages with actionable guidance
+- Success confirmations with transaction links
+- Progress indicators for uploads/executions
+- Responsive design for mobile/desktop
+
+## Environment Variables Required
+- `NEXT_PUBLIC_BACKEND_URL` - Backend API URL
+- `NEXT_PUBLIC_SOMNIA_CHAIN_ID` - Somnia chain ID (50312)
+- `NEXT_PUBLIC_ACCESS_NFT_ADDRESS` - NFT contract address
+- Wallet connection configuration (Wagmi config)
+
+## Future Enhancement Opportunities
+
+### Real-time Updates
+- WebSocket connection for transaction status
+- Real-time document upload progress
+- Live AI execution streaming
+
+### Advanced Features
+- Batch document operations
+- Document sharing between NFT holders
+- Advanced AI model configuration
+- Custom prompt templates
+- Document versioning
+
+### Performance Optimizations
+- IPFS caching strategies
+- Lazy loading for document lists
+- Background sync for offline operations
+- CDN integration for static assets
+
+### Security Enhancements
+- Request signing for critical operations
+- Rate limiting on frontend
+- Input sanitization and validation
+- Secure storage of sensitive data
+
+## Testing Requirements
+
+### Unit Tests
+- Component rendering tests
+- API call mocking
+- Error state handling
+- Form validation
+
+### Integration Tests
+- Full user flows (connect → mint → upload → execute)
+- Crossmint vs MetaMask flows
+- Network switching scenarios
+- Error recovery flows
+
+### E2E Tests
+- Complete user journeys
+- Multi-device testing
+- Performance testing
+- Load testing
+
+## Deployment Considerations
+
+### Build Configuration
+- Next.js static generation where possible
+- API route optimization
+- Bundle size optimization
+- Image optimization
+
+### CDN Integration
+- IPFS gateway integration
+- Static asset delivery
+- Global distribution
+
+### Monitoring
+- Frontend error tracking
+- Performance monitoring
+- User analytics
+- API usage tracking

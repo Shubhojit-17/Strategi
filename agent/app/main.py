@@ -30,6 +30,31 @@ load_dotenv(dotenv_path=env_path)
 audit_logger = setup_logging(log_dir="logs", log_level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
+
+# Background task for blockchain recording
+async def record_document_async(
+    cid: str,
+    document_hash: str,
+    filename: str,
+    file_size: int,
+    token_id: int,
+    blockchain_client: SomniaClient
+):
+    """Background task to record document on blockchain without blocking upload response"""
+    try:
+        logger.info(f"[Background] Recording document on chain: {filename}")
+        result = await blockchain_client.record_document_on_chain(
+            cid=cid,
+            document_hash=document_hash,
+            filename=filename,
+            file_size=file_size,
+            token_id=token_id
+        )
+        logger.info(f"[Background] Document recorded successfully: {result.get('document_id')}, TX: {result.get('tx_hash')}")
+    except Exception as e:
+        logger.error(f"[Background] Failed to record document on chain: {e}", exc_info=True)
+
+
 # Initialize FastAPI
 app = FastAPI(
     title="Somnia AI Agents API",
@@ -265,6 +290,7 @@ async def check_nft_authentication(user_address: str):
 
 @app.post("/documents/upload")
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user_address: str = Form(...)
 ):
@@ -274,7 +300,7 @@ async def upload_document(
     1. Verify user has minted NFT
     2. Authenticate via NFT ownership
     3. Upload document to IPFS
-    4. Store document hash on blockchain
+    4. Record on blockchain in background (non-blocking)
     """
     
     try:
@@ -339,7 +365,20 @@ async def upload_document(
             
             logger.info(f"=== UPLOAD SUCCESS === CID: {cid}")
             
-            # STEP 4: Return data for blockchain storage
+            # STEP 4: Record on blockchain in background (non-blocking)
+            if somnia_client and token_id:
+                background_tasks.add_task(
+                    record_document_async,
+                    cid=cid,
+                    document_hash=document_hash,
+                    filename=file.filename,
+                    file_size=len(content),
+                    token_id=token_id,
+                    blockchain_client=somnia_client
+                )
+                logger.info(f"[Background] Queued blockchain recording task for {file.filename}")
+            
+            # STEP 5: Return data immediately (blockchain recording happens in background)
             return {
                 "success": True,
                 "cid": cid,
@@ -349,7 +388,7 @@ async def upload_document(
                 "uploader": user_address,
                 "file_size": len(content),
                 "gateway_url": f"https://gateway.pinata.cloud/ipfs/{cid}",
-                "message": "Document uploaded successfully to your decentralized storage."
+                "message": "Document uploaded successfully. Blockchain recording in progress."
             }
         
         finally:
@@ -367,11 +406,10 @@ async def upload_document(
 @app.get("/documents/list")
 async def list_user_documents(user_address: str):
     """
-    List all documents uploaded by a user (requires NFT authentication)
-    Simulates decentralized Dropbox - shows all files in user's storage
+    List all documents uploaded by a user from blockchain registry
+    Queries DocumentUploaded events from CompanyDropbox contract
     
-    Note: In production, this would query a database or blockchain events
-    For demo, we return a message about implementing document registry
+    Returns document metadata sorted by most recent first
     """
     if not nft_authenticator:
         raise HTTPException(
@@ -389,23 +427,32 @@ async def list_user_documents(user_address: str):
                 detail="NFT authentication required to view documents"
             )
         
-        # TODO: Implement document registry
-        # This would query:
-        # - Database of uploaded CIDs linked to user_address
-        # - Or blockchain events from CompanyDropbox contract
-        # - Or IPFS MFS (Mutable File System) for user's folder
+        # Query blockchain for user's documents
+        if not somnia_client:
+            raise HTTPException(
+                status_code=503,
+                detail="Blockchain client not initialized"
+            )
+        
+        logger.info(f"Fetching document history for user: {user_address}")
+        documents = await somnia_client.get_user_documents(user_address)
+        
+        # Add gateway URLs for convenience
+        for doc in documents:
+            doc["gateway_url"] = f"https://gateway.pinata.cloud/ipfs/{doc['ipfs_hash']}"
         
         return {
             "user_address": user_address,
             "token_id": auth_result["token_id"],
-            "documents": [],
-            "message": "Document registry not yet implemented. Store CIDs in frontend localStorage or implement blockchain event indexing."
+            "documents": documents,
+            "count": len(documents),
+            "message": f"Found {len(documents)} documents"
         }
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error listing documents: {e}")
+        logger.error(f"Error listing documents: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -433,26 +480,43 @@ async def execute_agent(
     7. Record provenance on Somnia
     """
     
-    # Create AI agent with specified provider and model
-    ai_agent = AIAgent(provider=request.provider, model=request.model)
-    logger.info(f"Using AI provider: {request.provider}, model: {request.model}")
-    
-    # 1. Verify NFT ownership (acts as access token)
-    owns_nft = await somnia_client.check_nft_ownership(
-        token_id=request.nft_token_id,
-        user_address=request.user_address
-    )
-    
-    if not owns_nft:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Access denied: Address {request.user_address} does not own NFT #{request.nft_token_id}"
-        )
-    
-    logger.info(f"✅ NFT Access Verified - User: {request.user_address}, Token: #{request.nft_token_id}, Document: {request.document_cid}")
-    
-    # 2. Fetch specified document from IPFS
     try:
+        # Create AI agent with specified provider and model
+        ai_agent = AIAgent(provider=request.provider, model=request.model)
+        logger.info(f"Using AI provider: {request.provider}, model: {request.model}")
+        
+        # 1. Verify NFT ownership (acts as access token)
+        owns_nft = await somnia_client.check_nft_ownership(
+            token_id=request.nft_token_id,
+            user_address=request.user_address
+        )
+        
+        if not owns_nft:
+            # Audit log: Access denied
+            audit_logger.log_access(
+                user_id=request.user_address,
+                resource=f"document:{request.document_cid}",
+                action="ai_execution",
+                granted=False,
+                reason=f"NFT #{request.nft_token_id} not owned by user"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied: Address {request.user_address} does not own NFT #{request.nft_token_id}"
+            )
+        
+        logger.info(f"✅ NFT Access Verified - User: {request.user_address}, Token: #{request.nft_token_id}, Document: {request.document_cid}")
+        
+        # Audit log: Access granted
+        audit_logger.log_access(
+            user_id=request.user_address,
+            resource=f"document:{request.document_cid}",
+            action="ai_execution",
+            granted=True,
+            reason=f"NFT #{request.nft_token_id} ownership verified"
+        )
+        
+        # 2. Fetch specified document from IPFS
         document_content = await ipfs_client.fetch(request.document_cid)
         
         # Try to determine if it's a PDF
@@ -478,75 +542,124 @@ async def execute_agent(
             # Regular text document
             document_text = document_content.decode('utf-8')
             logger.info(f"📄 Fetched text document from IPFS: {request.document_cid} ({len(document_text)} chars)")
-            
-    except Exception as e:
-        logger.error(f"Failed to fetch/parse document {request.document_cid}: {e}")
-        raise HTTPException(
-            status_code=404,
-            detail=f"Document not found or could not be parsed: {request.document_cid}"
+        
+        # 3. Commit inputs
+        chunks = [document_text]  # In production, chunk properly
+        input_root = verifiable_agent.commit_inputs(
+            document_cid=request.document_cid,
+            chunks=chunks,
+            metadata={"prompt": request.prompt}
+        )
+        
+        # 5. Execute AI with logging
+        verifiable_agent.log_step("prompt", {"text": request.prompt})
+        
+        # Call AI model
+        output_text = await ai_agent.execute(
+            prompt=request.prompt,
+            context=document_text,
+            verifiable_agent=verifiable_agent  # Pass for step logging
+        )
+        
+        verifiable_agent.log_step("llm_response", {
+            "text": output_text,
+            "model": request.model
+        })
+        
+        # 6. Compute execution root
+        execution_root = verifiable_agent.compute_execution_root()
+        logger.info(f"🔍 Input root: {input_root}")
+        logger.info(f"🔍 Execution root: {execution_root}")
+        logger.info(f"🔍 Execution steps count: {len(verifiable_agent.execution_steps)}")
+        
+        # 7. Upload trace to IPFS
+        trace = verifiable_agent.get_execution_trace()
+        trace_cid = await ipfs_client.upload_json(trace, f"trace-{execution_root[:10]}.json")
+        
+        # 8. Upload output to IPFS
+        output_data = {
+            "prompt": request.prompt,
+            "output": output_text,
+            "model": request.model,
+            "input_cid": request.document_cid
+        }
+        output_cid = await ipfs_client.upload_json(output_data, f"output-{execution_root[:10]}.json")
+        
+        # 9. Record provenance on Somnia
+        result = await somnia_client.record_provenance(
+            nft_token_id=request.nft_token_id,
+            input_cid=request.document_cid,
+            input_root=input_root,
+            output_cid=output_cid,
+            execution_root=execution_root,
+            trace_cid=trace_cid,
+            agent_did=AGENT_DID
+        )
+        
+        # Audit log: AI execution completed
+        audit_logger.log_ai_execution(
+            did=AGENT_DID,
+            prompt_hash=input_root[:20],
+            response_hash=execution_root[:20],
+            model=request.model,
+            tokens=len(output_text),  # Approximate token count
+            user_address=request.user_address,
+            document_cid=request.document_cid,
+            output_cid=output_cid,
+            trace_cid=trace_cid,
+            tx_hash=result["tx_hash"]
+        )
+        
+        # Audit log: Blockchain transaction
+        audit_logger.log_blockchain_tx(
+            operation="record_provenance",
+            tx_hash=result["tx_hash"],
+            did=AGENT_DID,
+            gas_used=result.get("gas_used"),
+            status="success",
+            nft_token_id=request.nft_token_id,
+            record_id=result["record_id"]
+        )
+        
+        logger.info(f"✅ AI Execution Complete - Output CID: {output_cid}, TX: {result['tx_hash']}")
+        
+        # Reset agent state
+        verifiable_agent.reset()
+        
+        return ExecutionResponse(
+            record_id=result["record_id"],
+            output_cid=output_cid,
+            execution_root=execution_root,
+            trace_cid=trace_cid,
+            tx_hash=result["tx_hash"],
+            output_text=output_text
         )
     
-    # 3. Commit inputs
-    chunks = [document_text]  # In production, chunk properly
-    input_root = verifiable_agent.commit_inputs(
-        document_cid=request.document_cid,
-        chunks=chunks,
-        metadata={"prompt": request.prompt}
-    )
-    
-    # 5. Execute AI with logging
-    verifiable_agent.log_step("prompt", {"text": request.prompt})
-    
-    # Call AI model
-    output_text = await ai_agent.execute(
-        prompt=request.prompt,
-        context=document_text,
-        verifiable_agent=verifiable_agent  # Pass for step logging
-    )
-    
-    verifiable_agent.log_step("llm_response", {
-        "text": output_text,
-        "model": request.model
-    })
-    
-    # 6. Compute execution root
-    execution_root = verifiable_agent.compute_execution_root()
-    
-    # 7. Upload trace to IPFS
-    trace = verifiable_agent.get_execution_trace()
-    trace_cid = await ipfs_client.upload_json(trace, f"trace-{execution_root[:10]}.json")
-    
-    # 8. Upload output to IPFS
-    output_data = {
-        "prompt": request.prompt,
-        "output": output_text,
-        "model": request.model,
-        "input_cid": request.document_cid
-    }
-    output_cid = await ipfs_client.upload_json(output_data, f"output-{execution_root[:10]}.json")
-    
-    # 9. Record provenance on Somnia
-    result = await somnia_client.record_provenance(
-        nft_token_id=request.nft_token_id,
-        input_cid=request.document_cid,
-        input_root=input_root,
-        output_cid=output_cid,
-        execution_root=execution_root,
-        trace_cid=trace_cid,
-        agent_did=AGENT_DID
-    )
-    
-    # Reset agent state
-    verifiable_agent.reset()
-    
-    return ExecutionResponse(
-        record_id=result["record_id"],
-        output_cid=output_cid,
-        execution_root=execution_root,
-        trace_cid=trace_cid,
-        tx_hash=result["tx_hash"],
-        output_text=output_text
-    )
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Handle all other exceptions (including RateLimitError)
+        from openai import RateLimitError, APIError
+        
+        if isinstance(e, RateLimitError):
+            logger.error(f"AI Provider rate limit exceeded: {e}")
+            raise HTTPException(
+                status_code=429,
+                detail=f"AI provider is temporarily rate-limited. Please try again in a few moments or switch to a different AI provider (gemini, mistral, or moonshot)."
+            )
+        elif isinstance(e, APIError):
+            logger.error(f"AI Provider API error: {e}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"AI provider error: {str(e)}"
+            )
+        else:
+            logger.error(f"Unexpected error in /execute endpoint: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"An internal server error occurred: {str(e)}"
+            )
 
 
 @app.get("/provenance/nft/{token_id}", response_model=List[ProvenanceRecord])
@@ -771,11 +884,43 @@ async def startup_event():
     print(f"   Address: {somnia_client.account.address if somnia_client.account else 'Not configured'}")
     
     # Check if agent is registered
-    is_registered = await somnia_client.is_agent_active(AGENT_DID)
-    print(f"   Registered: {is_registered}")
-    
-    if not is_registered:
-        print(f"   ⚠️  Agent not registered on Somnia. Call POST /agent/register")
+    try:
+        is_registered = await somnia_client.is_agent_active(AGENT_DID)
+        print(f"   Registered: {is_registered}")
+        
+        if not is_registered:
+            print(f"   ⚠️  Agent not registered. Auto-registering...")
+            
+            # Upload default metadata to IPFS
+            metadata = {
+                "name": "Strategi AI Agent",
+                "description": "Verifiable AI agent for document processing",
+                "model": os.getenv("AI_MODEL", "mistral-7b-instruct"),
+                "provider": os.getenv("AI_PROVIDER", "mistral"),
+                "capabilities": ["document_analysis", "summarization", "qa", "pdf_processing"],
+                "did": AGENT_DID,
+                "version": "1.0.0"
+            }
+            
+            metadata_cid = await ipfs_client.upload_json(
+                metadata,
+                filename=f"agent-{AGENT_DID[:10]}.json"
+            )
+            
+            # Register on-chain
+            tx_hash = await somnia_client.register_agent(
+                did=AGENT_DID,
+                name="Strategi AI Agent",
+                metadata_cid=metadata_cid
+            )
+            
+            print(f"   ✅ Agent registered successfully!")
+            print(f"   Transaction: {tx_hash}")
+            print(f"   Metadata CID: {metadata_cid}")
+    except Exception as e:
+        print(f"   ⚠️  Agent registration check failed: {e}")
+        print(f"   Agent will still function, but blockchain features may be limited")
+        logger.error(f"Startup registration error: {e}", exc_info=True)
 
 
 if __name__ == "__main__":
