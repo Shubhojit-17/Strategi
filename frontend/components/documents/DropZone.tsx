@@ -3,6 +3,7 @@
 import React, { useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassPanel from '../ui/GlassPanel';
+import { Page, WarningTriangle } from 'iconoir-react';
 
 interface DropZoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -10,6 +11,8 @@ interface DropZoneProps {
   maxFiles?: number;
   maxSize?: number; // in MB
   disabled?: boolean;
+  onDragEnter?: () => void;
+  onDragLeave?: () => void;
 }
 
 export const DropZone: React.FC<DropZoneProps> = ({
@@ -18,6 +21,8 @@ export const DropZone: React.FC<DropZoneProps> = ({
   maxFiles = 5,
   maxSize = 10,
   disabled = false,
+  onDragEnter,
+  onDragLeave,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string>();
@@ -63,16 +68,18 @@ export const DropZone: React.FC<DropZoneProps> = ({
       e.stopPropagation();
       if (!disabled) {
         setIsDragging(true);
+        onDragEnter?.();
       }
     },
-    [disabled]
+    [disabled, onDragEnter]
   );
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-  }, []);
+    onDragLeave?.();
+  }, [onDragLeave]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -129,101 +136,68 @@ export const DropZone: React.FC<DropZoneProps> = ({
   );
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full h-full">
       <motion.div
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        animate={{
-          scale: isDragging ? 1.02 : 1,
-          borderColor: isDragging ? '#3CF2FF' : 'rgba(60, 242, 255, 0.3)',
-        }}
-        transition={{ duration: 0.2 }}
-        className={`relative ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        className={`relative w-full h-full flex items-center justify-center ${
+          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+        }`}
       >
-        <GlassPanel
-          className={`p-12 text-center border-2 border-dashed transition-all ${
-            isDragging ? 'border-primary-light bg-primary-dark/20' : 'border-primary-light/30'
+        <input
+          type="file"
+          multiple
+          accept={accept}
+          onChange={handleFileInput}
+          disabled={disabled}
+          className="hidden"
+          id="file-input"
+        />
+
+        <label
+          htmlFor="file-input"
+          className={`flex flex-col items-center gap-3 ${
+            disabled ? 'cursor-not-allowed' : 'cursor-pointer'
           }`}
         >
-          <input
-            type="file"
-            multiple
-            accept={accept}
-            onChange={handleFileInput}
-            disabled={disabled}
-            className="hidden"
-            id="file-input"
-          />
-
-          <label
-            htmlFor="file-input"
-            className={`flex flex-col items-center gap-4 ${
-              disabled ? 'cursor-not-allowed' : 'cursor-pointer'
-            }`}
+          {/* Icon */}
+          <motion.div
+            animate={{
+              y: isDragging ? -8 : 0,
+              scale: isDragging ? 1.15 : 1,
+            }}
+            transition={{ duration: 0.3 }}
+            className="text-cyan-400"
           >
-            {/* Icon */}
-            <motion.div
-              animate={{
-                y: isDragging ? -10 : 0,
-                scale: isDragging ? 1.2 : 1,
-              }}
-              transition={{ duration: 0.3 }}
-              className="text-6xl"
-            >
-              📄
-            </motion.div>
+            <Page className="w-16 h-16" strokeWidth={1.5} />
+          </motion.div>
 
-            {/* Text */}
-            <div className="space-y-2">
-              <p className="text-xl font-semibold text-primary-light">
-                {isDragging ? 'Drop files here' : 'Drag & drop your documents'}
-              </p>
-              <p className="text-gray-400 text-sm">
-                or click to browse files
-              </p>
-            </div>
-
-            {/* File info */}
-            <div className="flex gap-4 text-xs text-gray-500 mt-4">
-              <span>Max {maxFiles} files</span>
-              <span>•</span>
-              <span>Up to {maxSize}MB each</span>
-              <span>•</span>
-              <span>PDF, DOC, TXT, MD</span>
-            </div>
-          </label>
-        </GlassPanel>
-
-        {/* Drag overlay */}
-        <AnimatePresence>
-          {isDragging && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-primary-light/10 border-2 border-primary-light rounded-lg pointer-events-none flex items-center justify-center"
-            >
-              <div className="text-primary-light text-2xl font-bold">
-                Drop to upload
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          {/* Text */}
+          <div className="space-y-1 text-center">
+            <p className="text-lg font-medium" style={{ color: '#3CF2FF' }}>
+              {isDragging ? 'Drop files here' : 'Drop files'}
+            </p>
+            <p className="text-xs opacity-70" style={{ color: '#82FFD2' }}>
+              or click to browse
+            </p>
+          </div>
+        </label>
       </motion.div>
 
-      {/* Error message */}
+      {/* Error message - positioned absolutely */}
       <AnimatePresence>
         {error && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mt-4"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute -bottom-20 left-1/2 transform -translate-x-1/2 w-64"
           >
-            <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-3">
-              <p className="text-red-300 text-sm">⚠️ {error}</p>
+            <div className="bg-red-900/40 border border-red-500/60 rounded-lg p-2 backdrop-blur-sm flex items-center justify-center gap-2">
+              <WarningTriangle className="w-4 h-4 text-red-400" />
+              <p className="text-red-300 text-xs text-center">{error}</p>
             </div>
           </motion.div>
         )}

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
 import { logger, LogCategory } from '@/lib/logger';
+import FloatingNode from '@/components/wallet/FloatingNode';
+import { motion } from 'framer-motion';
 
 // Extend window type for MetaMask
 declare global {
@@ -13,6 +15,14 @@ declare global {
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 const SOMNIA_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_SOMNIA_CHAIN_ID || '50312');
+
+// Bioluminescent color palette
+const colors = {
+  coreGlow: '#3CF2FF',
+  plasmaAccent: '#82FFD2',
+  deepOcean: '#0F1423',
+  biolightPurple: '#A37CFF',
+};
 
 export default function UnifiedWalletConnect() {
   const { address, isConnected, chain } = useAccount();
@@ -289,158 +299,426 @@ export default function UnifiedWalletConnect() {
 
   if (!mounted) {
     return (
-      <div className="bg-gray-800/50 backdrop-blur-sm border border-white/10 p-6 rounded-lg">
-        <p className="text-gray-300">Loading...</p>
+      <div className="relative w-full h-full flex items-center justify-center min-h-screen" style={{ backgroundColor: colors.deepOcean }}>
+        <motion.div
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="text-lg font-semibold"
+          style={{ color: colors.coreGlow, textShadow: `0 0 10px ${colors.coreGlow}` }}
+        >
+          Loading...
+        </motion.div>
       </div>
     );
   }
 
-  // Show connection options when not connected
+  // Show connection options when not connected - BIOLUMINESCENT BLOOM INTERFACE
   if (!connectionMethod) {
     return (
-      <div className="bg-gray-800/50 backdrop-blur-sm border border-white/10 p-6 rounded-lg">
-        <h2 className="text-2xl font-bold mb-4 text-white">Connect Wallet</h2>
-        <p className="text-gray-300 mb-6">Choose ONE method to connect:</p>
-        
-        <div className="space-y-4">
-          {/* MetaMask Option */}
-          <div className="border border-blue-500/50 rounded-lg p-4 bg-blue-500/10">
-            <h3 className="text-lg font-semibold text-white mb-2">🦊 Option 1: MetaMask</h3>
-            <p className="text-gray-300 text-sm mb-3">Connect using your MetaMask browser extension</p>
-            
-            {(isConnectingMetaMask || isConnecting) && (
-              <div className="mb-3 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded">
-                <p className="text-yellow-200 text-sm font-medium">
-                  ⏳ Waiting for MetaMask...
-                </p>
-                <p className="text-yellow-100 text-xs mt-1">
-                  Click the MetaMask fox icon 🦊 in your browser toolbar to approve the connection
-                </p>
-              </div>
-            )}
-            
-            <button
-              onClick={handleMetaMaskConnect}
-              disabled={isConnectingMetaMask || isConnecting}
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:bg-gray-600 disabled:cursor-not-allowed"
-            >
-              {isConnectingMetaMask || isConnecting ? '⏳ Connecting...' : 'Connect MetaMask'}
-            </button>
-          </div>
+      <div
+        className="relative w-full min-h-screen flex flex-col items-center justify-center gap-12 p-8"
+        style={{ backgroundColor: colors.deepOcean }}
+      >
+        {/* Background gradient effect */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at 50% 50%, ${colors.biolightPurple}10 0%, ${colors.deepOcean} 70%)`,
+          }}
+        />
 
-          {/* Crossmint Option */}
-          <div className="border border-purple-500/50 rounded-lg p-4 bg-purple-500/10">
-            <h3 className="text-lg font-semibold text-white mb-2">📧 Option 2: Email (Crossmint)</h3>
-            <p className="text-gray-300 text-sm mb-3">Create a wallet using just your email</p>
-            <input
-              type="email"
-              value={crossmintEmail}
-              onChange={(e) => setCrossmintEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="w-full px-4 py-2 mb-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 outline-none"
-            />
-            <button
-              onClick={handleCrossmintLogin}
-              disabled={crossmintLoading || !crossmintEmail}
-              className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium disabled:bg-gray-600 disabled:text-gray-400"
-            >
-              {crossmintLoading ? 'Creating Wallet...' : 'Create/Login with Email'}
-            </button>
-            {crossmintError && (
-              <p className="mt-2 text-red-300 text-sm">{crossmintError}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
-          <p className="text-yellow-200 text-sm">
-            ⚠️ <strong>Note:</strong> You can only use ONE wallet connection method at a time.
+        {/* Title Section */}
+        <motion.div
+          className="relative z-10 text-center"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <h1
+            className="text-4xl md:text-5xl font-bold mb-3"
+            style={{
+              color: colors.coreGlow,
+              textShadow: `0 0 20px ${colors.coreGlow}, 0 0 40px ${colors.plasmaAccent}`,
+            }}
+          >
+            Strategi
+          </h1>
+          <p
+            className="text-lg"
+            style={{
+              color: colors.plasmaAccent,
+              textShadow: `0 0 10px ${colors.plasmaAccent}`,
+            }}
+          >
+            Connect Your Wallet
           </p>
-        </div>
-      </div>
-    );
-  }
+          <div
+            className="w-24 h-1 mx-auto mt-4 rounded-full"
+            style={{
+              background: `linear-gradient(90deg, ${colors.coreGlow}, ${colors.plasmaAccent}, ${colors.biolightPurple})`,
+              boxShadow: `0 0 20px ${colors.coreGlow}`,
+            }}
+          />
+        </motion.div>
 
-  // Show connected wallet info
-  if (connectionMethod === 'metamask' && isConnected && address) {
-    return (
-      <div className="bg-gray-800/50 backdrop-blur-sm border border-white/10 p-6 rounded-lg">
-        <h2 className="text-xl font-bold mb-3 text-white">✅ Connected (MetaMask)</h2>
-        
-        {/* Network Warning */}
-        {networkWarning && (
-          <div className="mb-4 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
-            <p className="text-red-200 font-medium mb-2">⚠️ Wrong Network!</p>
-            <p className="text-sm text-gray-300 mb-3">
-              Please switch to <strong>Somnia Shannon Testnet</strong>
+        {/* Floating Node Selection */}
+        <div
+          className="relative z-10 flex flex-col md:flex-row gap-20 md:gap-32 items-center justify-center"
+          style={{
+            filter: 'drop-shadow(0 0 30px rgba(60, 242, 255, 0.2))',
+          }}
+        >
+          {/* MetaMask Node */}
+          <FloatingNode
+            icon="🦊"
+            label="MetaMask"
+            onClick={handleMetaMaskConnect}
+            isLoading={isConnectingMetaMask || isConnecting}
+            isDisabled={crossmintWallet || isConnected}
+          />
+
+          {/* Crossmint Node */}
+          <FloatingNode
+            icon="📧"
+            label="Crossmint"
+            onClick={() => {
+              // For now, show an email input modal or simple email prompt
+              const email = prompt('Enter your email for Crossmint wallet:');
+              if (email) {
+                setCrossmintEmail(email);
+                handleCrossmintLogin();
+              }
+            }}
+            isLoading={crossmintLoading}
+            isDisabled={isConnected || crossmintWallet}
+          />
+        </div>
+
+        {/* Connection Status Messages */}
+        {(isConnectingMetaMask || isConnecting) && (
+          <motion.div
+            className="relative z-10 p-4 rounded-lg text-center max-w-md"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: `rgba(60, 242, 255, 0.1)`,
+              border: `2px solid ${colors.coreGlow}`,
+              boxShadow: `0 0 20px ${colors.coreGlow}40`,
+            }}
+          >
+            <p style={{ color: colors.coreGlow }} className="font-semibold">
+              ⏳ Waiting for MetaMask...
             </p>
-            <p className="text-xs text-gray-400 mb-3">
-              Current: {chain?.name || 'Unknown'} (ID: {chain?.id || 'N/A'})
-              <br />
-              Expected: Somnia L1 (ID: {SOMNIA_CHAIN_ID})
+            <p style={{ color: colors.plasmaAccent }} className="text-sm mt-2">
+              Click the MetaMask fox icon 🦊 in your browser toolbar
             </p>
-            <button
-              onClick={handleSwitchToSomnia}
-              className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-medium"
-            >
-              Switch to Somnia Network
-            </button>
-          </div>
+          </motion.div>
         )}
 
-        {/* Wallet Info */}
-        <div className="space-y-3">
-          <div className="bg-blue-500/20 p-3 rounded border border-blue-500/50">
-            <p className="text-sm text-gray-300">Wallet Address:</p>
-            <p className="text-white font-mono text-sm break-all">{address}</p>
-          </div>
-          <div className="bg-green-500/20 p-3 rounded border border-green-500/50">
-            <p className="text-sm text-gray-300">Network:</p>
-            <p className="text-white font-mono text-sm">
-              {chain?.name || 'Unknown'} (Chain ID: {chain?.id || 'N/A'})
-            </p>
-            {chain?.id === SOMNIA_CHAIN_ID && (
-              <p className="text-xs text-green-300 mt-1">✅ Correct network</p>
-            )}
-          </div>
-          <button
-            onClick={handleMetaMaskDisconnect}
-            className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+        {connectError && (
+          <motion.div
+            className="relative z-10 p-4 rounded-lg text-center max-w-md"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: 'rgba(255, 59, 48, 0.1)',
+              border: '2px solid #FF3B30',
+              boxShadow: '0 0 20px rgba(255, 59, 48, 0.4)',
+            }}
           >
-            Disconnect MetaMask
-          </button>
-        </div>
+            <p style={{ color: '#FF6B6B' }} className="font-semibold">
+              ❌ Connection Error
+            </p>
+            <p style={{ color: '#FFB3B3' }} className="text-sm mt-2">
+              {connectError.message || 'Failed to connect'}
+            </p>
+          </motion.div>
+        )}
+
+        {/* Info Footer */}
+        <motion.div
+          className="relative z-10 text-center text-sm max-w-lg"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.8 }}
+          style={{ color: colors.plasmaAccent }}
+        >
+          <p className="mb-2">
+            💡 <strong>Choose ONE wallet connection method</strong>
+          </p>
+          <p className="text-xs" style={{ color: colors.coreGlow }}>
+            MetaMask provides the most security. Crossmint offers email-based access.
+          </p>
+        </motion.div>
       </div>
     );
   }
 
+  // Show connected wallet info - MetaMask
+  if (connectionMethod === 'metamask' && isConnected && address) {
+    return (
+      <div
+        className="relative w-full min-h-screen flex flex-col items-center justify-center p-8"
+        style={{ backgroundColor: colors.deepOcean }}
+      >
+        {/* Background gradient effect */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at 50% 50%, ${colors.biolightPurple}10 0%, ${colors.deepOcean} 70%)`,
+          }}
+        />
+
+        <motion.div
+          className="relative z-10 max-w-lg w-full"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6 }}
+        >
+          {/* Success Header */}
+          <div className="text-center mb-8">
+            <motion.div
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 0.8, repeat: 1 }}
+              className="text-6xl mb-3"
+            >
+              ✅
+            </motion.div>
+            <h2
+              className="text-3xl font-bold mb-2"
+              style={{
+                color: colors.coreGlow,
+                textShadow: `0 0 20px ${colors.coreGlow}`,
+              }}
+            >
+              Connected
+            </h2>
+            <p style={{ color: colors.plasmaAccent }}>MetaMask Wallet</p>
+          </div>
+
+          {/* Network Warning */}
+          {networkWarning && (
+            <motion.div
+              className="mb-6 p-4 rounded-lg"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                background: 'rgba(255, 107, 107, 0.1)',
+                border: `2px solid #FF6B6B`,
+                boxShadow: `0 0 20px rgba(255, 107, 107, 0.3)`,
+              }}
+            >
+              <p style={{ color: '#FFB3B3' }} className="font-semibold mb-2">
+                ⚠️ Wrong Network!
+              </p>
+              <p style={{ color: '#FFCCCC' }} className="text-sm mb-3">
+                Please switch to <strong>Somnia L1</strong>
+              </p>
+              <p style={{ color: '#FFB3B3' }} className="text-xs mb-4">
+                Current: {chain?.name || 'Unknown'} (ID: {chain?.id || 'N/A'})
+                <br />
+                Expected: Somnia L1 (ID: {SOMNIA_CHAIN_ID})
+              </p>
+              <button
+                onClick={handleSwitchToSomnia}
+                className="w-full px-4 py-2 rounded-lg font-medium transition"
+                style={{
+                  background: colors.plasmaAccent,
+                  color: colors.deepOcean,
+                  boxShadow: `0 0 15px ${colors.plasmaAccent}`,
+                }}
+              >
+                Switch Network
+              </button>
+            </motion.div>
+          )}
+
+          {/* Wallet Info Cards */}
+          <div className="space-y-4 mb-6">
+            {/* Address Card */}
+            <motion.div
+              className="p-4 rounded-lg backdrop-blur-sm"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              style={{
+                background: `rgba(60, 242, 255, 0.08)`,
+                border: `1px solid ${colors.coreGlow}`,
+                boxShadow: `0 0 15px ${colors.coreGlow}20`,
+              }}
+            >
+              <p style={{ color: colors.plasmaAccent }} className="text-xs font-semibold mb-1">
+                WALLET ADDRESS
+              </p>
+              <p className="font-mono text-sm break-all" style={{ color: colors.coreGlow }}>
+                {address}
+              </p>
+            </motion.div>
+
+            {/* Network Card */}
+            <motion.div
+              className="p-4 rounded-lg backdrop-blur-sm"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              style={{
+                background: `rgba(130, 255, 210, 0.08)`,
+                border: `1px solid ${colors.plasmaAccent}`,
+                boxShadow: `0 0 15px ${colors.plasmaAccent}20`,
+              }}
+            >
+              <p style={{ color: colors.coreGlow }} className="text-xs font-semibold mb-1">
+                NETWORK
+              </p>
+              <p style={{ color: colors.plasmaAccent }} className="font-mono text-sm mb-2">
+                {chain?.name || 'Unknown'} (ID: {chain?.id || 'N/A'})
+              </p>
+              {chain?.id === SOMNIA_CHAIN_ID && (
+                <p style={{ color: colors.plasmaAccent }} className="text-xs">
+                  ✅ Correct network
+                </p>
+              )}
+            </motion.div>
+          </div>
+
+          {/* Disconnect Button */}
+          <motion.button
+            onClick={handleMetaMaskDisconnect}
+            className="w-full px-6 py-3 rounded-lg font-semibold transition"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            style={{
+              background: `linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 59, 48, 0.1))`,
+              border: `2px solid #FF6B6B`,
+              color: '#FFB3B3',
+              boxShadow: `0 0 15px rgba(255, 107, 107, 0.3)`,
+            }}
+          >
+            Disconnect Wallet
+          </motion.button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Show connected wallet info - Crossmint
   if (connectionMethod === 'crossmint' && crossmintWallet) {
     return (
-      <div className="bg-gray-800/50 backdrop-blur-sm border border-white/10 p-6 rounded-lg">
-        <h2 className="text-xl font-bold mb-3 text-white">✅ Connected (Crossmint)</h2>
-        <div className="space-y-3">
-          <div className="bg-purple-500/20 p-3 rounded border border-purple-500/50">
-            <p className="text-sm text-gray-300">Email:</p>
-            <p className="text-white text-sm">{crossmintWallet.email}</p>
+      <div
+        className="relative w-full min-h-screen flex flex-col items-center justify-center p-8"
+        style={{ backgroundColor: colors.deepOcean }}
+      >
+        {/* Background gradient effect */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at 50% 50%, ${colors.biolightPurple}10 0%, ${colors.deepOcean} 70%)`,
+          }}
+        />
+
+        <motion.div
+          className="relative z-10 max-w-lg w-full"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6 }}
+        >
+          {/* Success Header */}
+          <div className="text-center mb-8">
+            <motion.div
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 0.8, repeat: 1 }}
+              className="text-6xl mb-3"
+            >
+              ✅
+            </motion.div>
+            <h2
+              className="text-3xl font-bold mb-2"
+              style={{
+                color: colors.coreGlow,
+                textShadow: `0 0 20px ${colors.coreGlow}`,
+              }}
+            >
+              Connected
+            </h2>
+            <p style={{ color: colors.plasmaAccent }}>Crossmint Wallet</p>
           </div>
-          <div className="bg-purple-500/20 p-3 rounded border border-purple-500/50">
-            <p className="text-sm text-gray-300">Wallet Address:</p>
-            <p className="text-white font-mono text-sm break-all">{crossmintWallet.walletAddress}</p>
-          </div>
-          {crossmintWallet.demo_mode && (
-            <div className="bg-yellow-500/20 p-3 rounded border border-yellow-500/50">
-              <p className="text-yellow-200 text-sm">
-                ⚠️ Demo mode - Crossmint API unavailable
+
+          {/* Wallet Info Cards */}
+          <div className="space-y-4 mb-6">
+            {/* Email Card */}
+            <motion.div
+              className="p-4 rounded-lg backdrop-blur-sm"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              style={{
+                background: `rgba(163, 124, 255, 0.08)`,
+                border: `1px solid ${colors.biolightPurple}`,
+                boxShadow: `0 0 15px ${colors.biolightPurple}20`,
+              }}
+            >
+              <p style={{ color: colors.plasmaAccent }} className="text-xs font-semibold mb-1">
+                EMAIL
               </p>
-            </div>
-          )}
-          <button
+              <p style={{ color: colors.biolightPurple }} className="text-sm">
+                {crossmintWallet.email}
+              </p>
+            </motion.div>
+
+            {/* Address Card */}
+            <motion.div
+              className="p-4 rounded-lg backdrop-blur-sm"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              style={{
+                background: `rgba(60, 242, 255, 0.08)`,
+                border: `1px solid ${colors.coreGlow}`,
+                boxShadow: `0 0 15px ${colors.coreGlow}20`,
+              }}
+            >
+              <p style={{ color: colors.plasmaAccent }} className="text-xs font-semibold mb-1">
+                WALLET ADDRESS
+              </p>
+              <p className="font-mono text-sm break-all" style={{ color: colors.coreGlow }}>
+                {crossmintWallet.walletAddress}
+              </p>
+            </motion.div>
+
+            {crossmintWallet.demo_mode && (
+              <motion.div
+                className="p-4 rounded-lg backdrop-blur-sm"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                style={{
+                  background: `rgba(255, 193, 7, 0.08)`,
+                  border: `1px solid #FFC107`,
+                  boxShadow: `0 0 15px rgba(255, 193, 7, 0.2)`,
+                }}
+              >
+                <p style={{ color: '#FFD54F' }} className="text-sm font-medium">
+                  ⚠️ Demo Mode - Crossmint API Unavailable
+                </p>
+              </motion.div>
+            )}
+          </div>
+
+          {/* Disconnect Button */}
+          <motion.button
             onClick={handleCrossmintDisconnect}
-            className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            className="w-full px-6 py-3 rounded-lg font-semibold transition"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            style={{
+              background: `linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 59, 48, 0.1))`,
+              border: `2px solid #FF6B6B`,
+              color: '#FFB3B3',
+              boxShadow: `0 0 15px rgba(255, 107, 107, 0.3)`,
+            }}
           >
-            Disconnect Email Wallet
-          </button>
-        </div>
+            Disconnect Wallet
+          </motion.button>
+        </motion.div>
       </div>
     );
   }

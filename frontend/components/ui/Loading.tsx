@@ -87,7 +87,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 
   return (
     <div
-      className={`animate-pulse bg-linear-to-r from-gray-800 via-gray-700 to-gray-800 bg-size-[200%_100%] ${variantClasses[variant]} ${className}`}
+      className={`animate-pulse bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 bg-size-[200%_100%] ${variantClasses[variant]} ${className}`}
       style={{
         animation: 'shimmer 2s infinite',
       }}
@@ -138,7 +138,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     <div className={className}>
       <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
         <motion.div
-          className="h-full bg-linear-to-r from-primary-light to-accent"
+          className="h-full bg-gradient-to-r from-primary-light to-accent"
           initial={{ width: 0 }}
           animate={{ width: `${clampedProgress}%` }}
           transition={{ duration: 0.3 }}

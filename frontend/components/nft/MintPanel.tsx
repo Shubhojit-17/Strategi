@@ -30,10 +30,10 @@ export const MintPanel: React.FC<MintPanelProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 50 }}
-      animate={{ opacity: 1, x: 0 }}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="w-full max-w-md"
+      className="w-full max-w-lg"
     >
       <GlassPanel className="p-8 space-y-6">
         {/* Header */}
@@ -147,41 +147,74 @@ export const MintPanel: React.FC<MintPanelProps> = ({
         )}
 
         {state === 'success' && tokenId !== undefined && (
-          <div className="space-y-4 py-8">
+          <div className="space-y-6 py-8">
             <div className="flex justify-center">
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1, rotate: 360 }}
                 transition={{ duration: 0.6, type: 'spring' }}
-                className="text-6xl"
+                className="text-7xl mb-2"
               >
-                🎉
+                ✓
               </motion.div>
             </div>
-            <h3 className="text-center text-green-400 font-bold text-2xl">
-              Success!
+            <h3 className="text-center text-green-400 font-bold text-3xl">
+              NFT Minted Successfully!
             </h3>
-            <p className="text-center text-gray-300">
-              Your NFT has been minted successfully
+            <p className="text-center text-gray-300 text-lg">
+              You now have full access to the platform
             </p>
-            <div className="bg-gradient-to-br from-green-900/30 to-primary-dark/30 rounded-lg p-6 text-center">
-              <p className="text-gray-400 text-sm mb-2">Your Token ID</p>
-              <p className="text-primary-light font-bold text-4xl">#{tokenId}</p>
+            
+            {/* Token Details Card */}
+            <div className="bg-gradient-to-br from-green-900/30 to-primary-dark/30 rounded-xl p-8 border-2 border-green-400/30">
+              <div className="text-center mb-6">
+                <p className="text-gray-400 text-sm mb-2">Your Token ID</p>
+                <p className="text-primary-light font-bold text-5xl mb-4">
+                  #{tokenId !== undefined ? tokenId : 'Pending...'}
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  <span className="text-green-400 text-sm font-medium">Active</span>
+                </div>
+              </div>
+              
+              {/* Benefits */}
+              <div className="space-y-3 pt-4 border-t border-gray-700/50">
+                <p className="text-gray-300 text-sm font-semibold mb-3">Access Includes:</p>
+                {[
+                  'AI document processing',
+                  'IPFS secure storage',
+                  'Unique digital identity',
+                  'Lifetime membership'
+                ].map((benefit, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 + i * 0.1 }}
+                    className="flex items-center gap-2 text-sm text-gray-300"
+                  >
+                    <span className="text-green-400">✓</span>
+                    <span>{benefit}</span>
+                  </motion.div>
+                ))}
+              </div>
             </div>
+            
             {transactionHash && (
               <a
                 href={`https://somnia-devnet.socialscan.io/tx/${transactionHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-center text-primary-light hover:text-primary-lighter text-sm underline"
+                className="block text-center text-primary-light hover:text-primary-lighter text-sm underline transition-colors"
               >
-                View on Explorer →
+                View Transaction on Explorer →
               </a>
             )}
             {onClose && (
               <AnimatedButton
                 onClick={onClose}
-                className="w-full py-3"
+                className="w-full py-4 text-lg font-semibold"
                 variant="primary"
               >
                 Continue to Dashboard

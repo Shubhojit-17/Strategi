@@ -1,240 +1,231 @@
-'use client';
+﻿'use client';
 
-import React, { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Sphere } from '@react-three/drei';
-import * as THREE from 'three';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DropZone } from './DropZone';
+import { FilePill } from './FilePill';
+
+interface FileState {
+  file: File;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  progress: number;
+  error?: string;
+  cid?: string;
+}
 
 interface UploadBubbleProps {
   status: 'idle' | 'uploading' | 'success' | 'error';
-  progress?: number; // 0-100
+  progress?: number;
+  onFilesSelected: (files: File[]) => void;
+  onDragStateChange?: (isDragging: boolean) => void;
+  files?: FileState[];
+  onRemoveFile?: (index: number) => void;
 }
-
-// Fresnel shader for glow effect
-const fresnelVertexShader = `
-  varying vec3 vNormal;
-  varying vec3 vPosition;
-  
-  void main() {
-    vNormal = normalize(normalMatrix * normal);
-    vPosition = position;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const fresnelFragmentShader = `
-  uniform vec3 glowColor;
-  uniform float intensity;
-  uniform float power;
-  
-  varying vec3 vNormal;
-  varying vec3 vPosition;
-  
-  void main() {
-    vec3 viewDirection = normalize(cameraPosition - vPosition);
-    float fresnel = pow(1.0 - abs(dot(viewDirection, vNormal)), power);
-    vec3 color = glowColor * fresnel * intensity;
-    gl_FragColor = vec4(color, fresnel * 0.8);
-  }
-`;
-
-// Ripple shader for upload effect
-const rippleVertexShader = `
-  uniform float time;
-  uniform float progress;
-  varying vec2 vUv;
-  varying float vDisplacement;
-  
-  void main() {
-    vUv = uv;
-    vec3 newPosition = position;
-    
-    // Create ripples based on progress
-    float ripple = sin(position.y * 10.0 + time * 5.0 - progress * 20.0) * 0.05;
-    newPosition += normal * ripple * (1.0 - progress);
-    
-    vDisplacement = ripple;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
-  }
-`;
-
-const rippleFragmentShader = `
-  uniform vec3 color;
-  uniform float progress;
-  varying vec2 vUv;
-  varying float vDisplacement;
-  
-  void main() {
-    vec3 baseColor = color;
-    float intensity = 1.0 - abs(vDisplacement) * 5.0;
-    vec3 finalColor = baseColor * intensity;
-    
-    // Add progress gradient
-    float gradient = smoothstep(0.0, 1.0, vUv.y + (1.0 - progress));
-    finalColor *= gradient;
-    
-    gl_FragColor = vec4(finalColor, 0.9);
-  }
-`;
 
 export const UploadBubble: React.FC<UploadBubbleProps> = ({
   status,
   progress = 0,
+  onFilesSelected,
+  onDragStateChange,
+  files = [],
+  onRemoveFile,
 }) => {
-  const mainSphereRef = useRef<THREE.Mesh>(null);
-  const fresnelRef = useRef<THREE.Mesh>(null);
-  const rippleRef = useRef<THREE.Mesh>(null);
-  const sparklesRef = useRef<THREE.Points>(null);
-  
-  // Get color based on status
-  const getColor = () => {
+  const hasFiles = files.length > 0;
+  const [isDragging, setIsDragging] = useState(false);
+  const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
+
+  const coreGlow = '#3CF2FF';
+  const plasmaAccent = '#82FFD2';
+  const deepOcean = '#0F1423';
+  const biolightPurple = '#A37CFF';
+
+  const handleDragEnter = () => {
+    setIsDragging(true);
+    onDragStateChange?.(true);
+    const newRipple = { id: Date.now(), x: (Math.random() - 0.5) * 60, y: (Math.random() - 0.5) * 60 };
+    setRipples((prev) => [...prev, newRipple]);
+    setTimeout(() => {
+      setRipples((prev) => prev.filter((r) => r.id !== newRipple.id));
+    }, 800);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+    onDragStateChange?.(false);
+  };
+
+  const getStatusColor = () => {
     switch (status) {
       case 'uploading':
-        return new THREE.Color(0x60a5fa); // Blue
+        return plasmaAccent;
       case 'success':
-        return new THREE.Color(0x34d399); // Green
+        return '#34d399';
       case 'error':
-        return new THREE.Color(0xef4444); // Red
+        return '#ef4444';
       default:
-        return new THREE.Color(0x8b5cf6); // Purple
+        return coreGlow;
     }
   };
 
-  const color = getColor();
-
-  // Sparkles for success state
-  const sparkles = useMemo(() => {
-    const count = 100;
-    const positions = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      const radius = 1.5 + Math.random() * 0.5;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.random() * Math.PI;
-      
-      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = radius * Math.cos(phi);
+  const statusColor = getStatusColor();
+  const [showSuccessBurst, setShowSuccessBurst] = useState(false);
+  
+  useEffect(() => {
+    if (status === 'success') {
+      setShowSuccessBurst(true);
+      setTimeout(() => setShowSuccessBurst(false), 1000);
     }
-    return positions;
-  }, []);
+  }, [status]);
 
-  // Animation loop
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime();
-
-    if (mainSphereRef.current) {
-      // Gentle rotation
-      mainSphereRef.current.rotation.y = time * 0.2;
-      
-      // Pulse animation
-      const pulse = 1 + Math.sin(time * 2) * 0.05;
-      mainSphereRef.current.scale.setScalar(pulse);
-
-      // Error shake
-      if (status === 'error') {
-        const shake = Math.sin(time * 20) * 0.02;
-        mainSphereRef.current.position.x = shake;
-      } else {
-        mainSphereRef.current.position.x = 0;
-      }
+  const [showErrorPulse, setShowErrorPulse] = useState(false);
+  
+  useEffect(() => {
+    if (status === 'error') {
+      setShowErrorPulse(true);
+      setTimeout(() => setShowErrorPulse(false), 1200);
     }
-
-    if (fresnelRef.current) {
-      fresnelRef.current.rotation.y = time * 0.3;
-      
-      // Pulsing glow
-      const material = fresnelRef.current.material as THREE.ShaderMaterial;
-      if (material.uniforms) {
-        material.uniforms.intensity.value = 2 + Math.sin(time * 3) * 0.5;
-      }
-    }
-
-    if (rippleRef.current && status === 'uploading') {
-      const material = rippleRef.current.material as THREE.ShaderMaterial;
-      if (material.uniforms) {
-        material.uniforms.time.value = time;
-        material.uniforms.progress.value = progress / 100;
-      }
-    }
-
-    if (sparklesRef.current && status === 'success') {
-      sparklesRef.current.rotation.y = time * 0.5;
-      
-      // Expand sparkles outward
-      const scale = 1 + (time % 2) * 0.5;
-      sparklesRef.current.scale.setScalar(scale);
-      
-      const material = sparklesRef.current.material as THREE.PointsMaterial;
-      material.opacity = 1 - ((time % 2) / 2);
-    }
-  });
+  }, [status]);
 
   return (
-    <group>
-      {/* Main sphere */}
-      <Sphere ref={mainSphereRef} args={[1, 64, 64]}>
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={0.5}
-          transparent
-          opacity={0.8}
-        />
-      </Sphere>
+    <div className="w-full h-full flex flex-col items-center justify-center relative">
+      <div className="absolute inset-0 opacity-5 pointer-events-none">
+        <svg className="w-full h-full" viewBox="0 0 1000 1000">
+          <defs>
+            <pattern id="upload-grid" width="100" height="100" patternUnits="userSpaceOnUse">
+              <path d="M 100 0 L 0 0 0 100" fill="none" stroke={coreGlow} strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width="1000" height="1000" fill="url(#upload-grid)" />
+        </svg>
+      </div>
 
-      {/* Fresnel glow */}
-      <Sphere ref={fresnelRef} args={[1.1, 64, 64]}>
-        <shaderMaterial
-          vertexShader={fresnelVertexShader}
-          fragmentShader={fresnelFragmentShader}
-          uniforms={{
-            glowColor: { value: color },
-            intensity: { value: 2 },
-            power: { value: 3 },
+      <div className="relative w-[32rem] h-[32rem] flex items-center justify-center">
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          animate={{
+            scale: isDragging ? 1.05 : status === 'uploading' ? [1, 1.03, 1] : [1, 1.02, 1],
+            boxShadow: isDragging || status === 'uploading'
+              ? `0 0 80px ${statusColor}, 0 0 120px ${statusColor}40, inset 0 0 40px ${biolightPurple}30`
+              : `0 0 50px ${coreGlow}, 0 0 80px ${plasmaAccent}30, inset 0 0 25px ${biolightPurple}15`,
           }}
-          transparent
-          side={THREE.BackSide}
+          transition={{ 
+            scale: { 
+              duration: status === 'uploading' ? 1.5 : 3, 
+              repeat: status === 'idle' || status === 'uploading' ? Infinity : 0, 
+              ease: 'easeInOut' 
+            }, 
+            boxShadow: { duration: 0.4 } 
+          }}
+          style={{ background: `radial-gradient(circle at 30% 30%, ${plasmaAccent}20, ${deepOcean}90)`, border: `2px solid ${statusColor}`, backdropFilter: 'blur(10px)' }}
         />
-      </Sphere>
 
-      {/* Ripple effect during upload */}
-      {status === 'uploading' && (
-        <Sphere ref={rippleRef} args={[1.2, 64, 64]}>
-          <shaderMaterial
-            vertexShader={rippleVertexShader}
-            fragmentShader={rippleFragmentShader}
-            uniforms={{
-              time: { value: 0 },
-              progress: { value: progress / 100 },
-              color: { value: color },
-            }}
-            transparent
-            side={THREE.DoubleSide}
-          />
-        </Sphere>
-      )}
+        <motion.div
+          className="absolute inset-3 rounded-full pointer-events-none"
+          animate={{ opacity: isDragging ? 0.9 : 0.6, scale: isDragging ? 1.08 : 1 }}
+          transition={{ duration: 0.4 }}
+          style={{ background: `linear-gradient(135deg, ${plasmaAccent}25, ${biolightPurple}20)`, border: `1px solid ${plasmaAccent}60`, boxShadow: `inset 0 2px 30px ${coreGlow}40`, backdropFilter: 'blur(8px)' }}
+        />
 
-      {/* Success sparkles */}
-      {status === 'success' && (
-        <points ref={sparklesRef}>
-          <bufferGeometry>
-            <bufferAttribute
-              attach="attributes-position"
-              count={sparkles.length / 3}
-              array={sparkles}
-              itemSize={3}
-              args={[sparkles, 3]}
+        {status === 'uploading' && (
+          <motion.svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <circle cx="50" cy="50" r="47" fill="none" stroke={`${statusColor}30`} strokeWidth="1.5" />
+            <motion.circle
+              cx="50" cy="50" r="47" fill="none" stroke={statusColor} strokeWidth="2"
+              strokeDasharray="295" strokeDashoffset={295 - (progress / 100) * 295} strokeLinecap="round"
+              style={{ filter: `drop-shadow(0 0 8px ${statusColor})`, transition: 'stroke-dashoffset 0.5s ease' }}
             />
-          </bufferGeometry>
-          <pointsMaterial
-            size={0.05}
-            color={0xfbbf24}
-            transparent
-            opacity={1}
-            sizeAttenuation
+          </motion.svg>
+        )}
+
+        <motion.div
+          className="absolute inset-8 rounded-full flex flex-col items-center justify-center overflow-hidden gap-4 p-6"
+          animate={{ scale: isDragging ? 1.15 : 1, boxShadow: isDragging ? `0 0 40px ${coreGlow}, inset 0 0 30px ${plasmaAccent}30` : `0 0 20px ${coreGlow}50, inset 0 0 15px ${plasmaAccent}15` }}
+          transition={{ duration: 0.4 }}
+          style={{ background: `radial-gradient(circle, ${coreGlow}12, ${deepOcean}85)`, border: `1px solid ${coreGlow}70`, backdropFilter: 'blur(6px)' }}
+        >
+          {/* File pills displayed inside bubble */}
+          <AnimatePresence mode="popLayout">
+            {hasFiles && (
+              <div className="flex flex-col gap-3 items-center max-h-[250px] overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-500/30 scrollbar-track-transparent">
+                {files.map((fileState, index) => (
+                  <FilePill
+                    key={index}
+                    fileName={fileState.file.name}
+                    fileSize={fileState.file.size}
+                    status={fileState.status === 'pending' ? 'idle' : fileState.status}
+                    progress={fileState.progress}
+                    onRemove={onRemoveFile ? () => onRemoveFile(index) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+          </AnimatePresence>
+          
+          {/* Drop zone - always present but shrinks when files exist */}
+          <motion.div
+            className="w-full"
+            animate={{ 
+              opacity: hasFiles ? 0.5 : 1,
+              scale: hasFiles ? 0.7 : 1,
+            }}
+            transition={{ duration: 0.3 }}
+          >
+            <DropZone onFilesSelected={onFilesSelected} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} />
+          </motion.div>
+        </motion.div>
+
+        {showSuccessBurst && (
+          <motion.div
+            className="absolute inset-0 rounded-full pointer-events-none"
+            initial={{ scale: 1, opacity: 1 }} animate={{ scale: 1.4, opacity: 0 }} transition={{ duration: 0.8, ease: 'easeOut' }}
+            style={{ border: `3px solid ${plasmaAccent}`, boxShadow: `0 0 50px ${plasmaAccent}, 0 0 100px ${plasmaAccent}60` }}
           />
-        </points>
-      )}
-    </group>
+        )}
+
+        {showErrorPulse && (
+          <motion.div
+            className="absolute inset-0 rounded-full pointer-events-none"
+            initial={{ opacity: 0 }} animate={{ opacity: [0, 0.8, 0] }} transition={{ duration: 1.2, times: [0, 0.3, 1] }}
+            style={{ border: `2px solid #ef4444`, boxShadow: `0 0 40px #ef4444, inset 0 0 40px ${biolightPurple}40`, background: `radial-gradient(circle, #ef444420, transparent)` }}
+          />
+        )}
+
+        <AnimatePresence>
+          {ripples.map((ripple) => (
+            <motion.div key={ripple.id} className="absolute rounded-full pointer-events-none"
+              initial={{ scale: 0.6, opacity: 1 }} animate={{ scale: 2.8, opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.8, ease: 'easeOut' }}
+              style={{ width: '120px', height: '120px', left: `calc(50% + ${ripple.x}px)`, top: `calc(50% + ${ripple.y}px)`, transform: 'translate(-50%, -50%)', border: `1px solid ${coreGlow}`, boxShadow: `0 0 20px ${coreGlow}80` }}
+            />
+          ))}
+        </AnimatePresence>
+
+        {status === 'uploading' && (
+          <div className="absolute inset-0 pointer-events-none">
+            {Array.from({ length: 24 }).map((_, i) => (
+              <motion.div key={i} className="absolute w-1.5 h-1.5 rounded-full"
+                style={{ background: i % 2 === 0 ? coreGlow : plasmaAccent, boxShadow: `0 0 8px ${i % 2 === 0 ? coreGlow : plasmaAccent}`, left: '50%', top: '50%' }}
+                animate={{ x: Math.cos((i / 24) * Math.PI * 2) * 200, y: Math.sin((i / 24) * Math.PI * 2) * 200, opacity: [0, 1, 0] }}
+                transition={{ duration: 1.2 + (i % 4) * 0.2, repeat: Infinity, ease: 'linear' }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <motion.div className="absolute bottom-16 text-center pointer-events-none" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+        <div className="text-base font-semibold tracking-wider mb-2" style={{ color: statusColor, textShadow: `0 0 12px ${statusColor}90, 0 0 24px ${statusColor}40` }}>
+          {status === 'idle' && !hasFiles && 'Drag & drop your documents'}
+          {status === 'idle' && hasFiles && `${files.length} ${files.length === 1 ? 'file' : 'files'} ready`}
+          {status === 'uploading' && `Uploading... ${Math.round(progress)}%`}
+          {status === 'success' && 'Upload complete!'}
+          {status === 'error' && 'Upload failed - please try again'}
+        </div>
+        {status === 'idle' && !hasFiles && (
+          <div className="text-sm opacity-80" style={{ color: plasmaAccent, textShadow: `0 0 6px ${plasmaAccent}70` }}>
+            or click the bubble to browse
+          </div>
+        )}
+      </motion.div>
+    </div>
   );
 };

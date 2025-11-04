@@ -9,6 +9,7 @@ interface WalletState {
   isConnected: boolean;
   isConnecting: boolean;
   hasNFT: boolean;
+  tokenId: number | null;
   isCheckingNFT: boolean;
   error: string | null;
   chainId: number | null;
@@ -17,7 +18,7 @@ interface WalletState {
 interface UseWalletReturn extends WalletState {
   connectMetaMask: () => Promise<void>;
   disconnect: () => void;
-  checkNFTOwnership: () => Promise<boolean>;
+  checkNFTOwnership: () => Promise<{ hasNFT: boolean; tokenId?: number }>;
   switchToSomniaNetwork: () => Promise<void>;
 }
 
@@ -37,6 +38,7 @@ export const useWallet = (): UseWalletReturn => {
     isConnected: false,
     isConnecting: false,
     hasNFT: false,
+    tokenId: null,
     isCheckingNFT: false,
     error: null,
     chainId: null,
@@ -99,10 +101,10 @@ export const useWallet = (): UseWalletReturn => {
   }, [connect]);
 
   // Check NFT ownership
-  const checkNFTOwnership = useCallback(async (): Promise<boolean> => {
+  const checkNFTOwnership = useCallback(async (): Promise<{ hasNFT: boolean; tokenId?: number }> => {
     if (!address) {
       console.error('No wallet address connected');
-      return false;
+      return { hasNFT: false };
     }
 
     try {
@@ -136,29 +138,32 @@ export const useWallet = (): UseWalletReturn => {
         setState((prev) => ({
           ...prev,
           hasNFT: false,
+          tokenId: null,
           isCheckingNFT: false,
           error: errorMessage,
         }));
-        return false;
+        return { hasNFT: false };
       }
 
       const data = await response.json();
       console.log('✅ Auth check response data:', data);
       
       const hasNFT = data.authenticated || data.hasAccess || data.hasNFT || false;
-      console.log('🔍 Computed hasNFT:', hasNFT);
+      const tokenId = data.tokenId || data.token_id || null;
+      console.log('🔍 Computed hasNFT:', hasNFT, ', tokenId:', tokenId);
 
       setState((prev) => {
-        console.log('📝 Updating state - hasNFT:', hasNFT, ', isCheckingNFT: false');
+        console.log('📝 Updating state - hasNFT:', hasNFT, ', tokenId:', tokenId, ', isCheckingNFT: false');
         return {
           ...prev,
           hasNFT,
+          tokenId,
           isCheckingNFT: false,
         };
       });
 
-      console.log('✅ checkNFTOwnership returning:', hasNFT);
-      return hasNFT;
+      console.log('✅ checkNFTOwnership returning:', { hasNFT, tokenId });
+      return { hasNFT, tokenId };
     } catch (error: any) {
       console.error('NFT ownership check error:', error);
       
@@ -167,8 +172,9 @@ export const useWallet = (): UseWalletReturn => {
         error: error.message || 'Failed to check NFT ownership',
         isCheckingNFT: false,
         hasNFT: false,
+        tokenId: null,
       }));
-      return false;
+      return { hasNFT: false };
     }
   }, [address]);
 
@@ -246,6 +252,7 @@ export const useWallet = (): UseWalletReturn => {
       isConnected: false,
       isConnecting: false,
       hasNFT: false,
+      tokenId: null,
       isCheckingNFT: false,
       error: null,
       chainId: null,

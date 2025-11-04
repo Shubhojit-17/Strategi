@@ -29,7 +29,6 @@ export const WalletConnect: React.FC<WalletConnectProps> = ({ onAuthenticated })
 
   const setWallet = useAppStore((state) => state.setWallet);
   const [selectedWallet, setSelectedWallet] = useState<'metamask' | 'crossmint' | null>(null);
-  const [showNetworkPrompt, setShowNetworkPrompt] = useState(false);
   const [showNFTError, setShowNFTError] = useState(false);
   const [authenticationStep, setAuthenticationStep] = useState<
     'select' | 'connecting' | 'checking-network' | 'checking-nft' | 'success' | 'error'
@@ -57,25 +56,64 @@ export const WalletConnect: React.FC<WalletConnectProps> = ({ onAuthenticated })
     }
   };
 
-  // Check network when connected
+  // Check network when connected and auto-switch if needed
   useEffect(() => {
-    if (isConnected && address && !isConnecting && mounted && authenticationStep === 'select') {
+    if (isConnected && address && !isConnecting && mounted && authenticationStep === 'connecting') {
       console.log('🔌 Wallet connected, checking network...');
       if (chainId !== SOMNIA_CHAIN_ID) {
+        console.log('⚠️ Wrong network detected, auto-switching to Somnia...');
         setAuthenticationStep('checking-network');
-        setShowNetworkPrompt(true);
+        // Automatically switch network without showing prompt
+        switchToSomniaNetwork().then(() => {
+          console.log('✅ Network switched, will check NFT after delay...');
+          // After switching, check NFT
+          setTimeout(async () => {
+            setAuthenticationStep('checking-nft');
+            try {
+              const result = await checkNFTOwnership();
+              console.log('🎯 NFT check after network switch completed. Result:', result);
+              if (result.hasNFT) {
+                setAuthenticationStep('success');
+                setWallet({
+                  address: address!,
+                  hasNFT: true,
+                  tokenId: result.tokenId || null,
+                  connectionMethod: 'metamask',
+                });
+                setTimeout(() => {
+                  console.log('Redirecting after success...');
+                  if (onAuthenticated) {
+                    onAuthenticated();
+                  } else {
+                    router.push('/');
+                  }
+                }, 1500);
+              } else {
+                setAuthenticationStep('error');
+                setShowNFTError(true);
+              }
+            } catch (error) {
+              console.error('Error in checkNFTOwnership after network switch:', error);
+              setAuthenticationStep('error');
+            }
+          }, 1000);
+        }).catch((error) => {
+          console.error('Error switching network:', error);
+          setAuthenticationStep('error');
+        });
       } else {
         // Network is correct, check NFT
         console.log('✅ Network correct, checking NFT ownership...');
         setAuthenticationStep('checking-nft');
         checkNFTOwnership()
-          .then((hasNFT) => {
-            console.log('🎯 NFT check completed. Result:', hasNFT);
-            if (hasNFT) {
+          .then((result) => {
+            console.log('🎯 NFT check completed. Result:', result);
+            if (result.hasNFT) {
               setAuthenticationStep('success');
               setWallet({
                 address,
                 hasNFT: true,
+                tokenId: result.tokenId || null,
                 connectionMethod: 'metamask',
               });
               setTimeout(() => {
@@ -99,42 +137,6 @@ export const WalletConnect: React.FC<WalletConnectProps> = ({ onAuthenticated })
     }
   }, [isConnected, address, chainId, isConnecting, mounted, authenticationStep]);
 
-  // Handle network switch
-  const handleSwitchNetwork = async () => {
-    setShowNetworkPrompt(false);
-    await switchToSomniaNetwork();
-    // After switching, check NFT
-    setTimeout(async () => {
-      setAuthenticationStep('checking-nft');
-      try {
-        const hasNFT = await checkNFTOwnership();
-        console.log('🎯 NFT check after network switch completed. Result:', hasNFT);
-        if (hasNFT) {
-          setAuthenticationStep('success');
-          setWallet({
-            address: address!,
-            hasNFT: true,
-            connectionMethod: 'metamask',
-          });
-          setTimeout(() => {
-            console.log('Redirecting after success...');
-            if (onAuthenticated) {
-              onAuthenticated();
-            } else {
-              router.push('/');
-            }
-          }, 1500);
-        } else {
-          setAuthenticationStep('error');
-          setShowNFTError(true);
-        }
-      } catch (error) {
-        console.error('Error in checkNFTOwnership after network switch:', error);
-        setAuthenticationStep('error');
-      }
-    }, 1000);
-  };
-
   // Handle errors
   useEffect(() => {
     if (error) {
@@ -147,62 +149,18 @@ export const WalletConnect: React.FC<WalletConnectProps> = ({ onAuthenticated })
     return null;
   }
 
+  const handleClose = () => {
+    router.push('/');
+  };
+
   return (
     <>
       <WalletGateway
         onWalletSelect={handleWalletSelect}
         selectedWallet={selectedWallet}
         isConnecting={isConnecting || authenticationStep === 'connecting'}
+        onClose={handleClose}
       />
-
-      {/* Network Switch Prompt */}
-      <AnimatePresence>
-        {showNetworkPrompt && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-            >
-              <GlassPanel className="p-8 max-w-md">
-                <div className="text-center space-y-4">
-                  <div className="text-6xl mb-4">🔄</div>
-                  <h2 className="text-2xl font-bold text-primary-light">
-                    Switch to Somnia Network
-                  </h2>
-                  <p className="text-gray-300">
-                    This application requires the Somnia network. Please switch your network to
-                    continue.
-                  </p>
-                  <div className="flex gap-4 justify-center mt-6">
-                    <button
-                      onClick={handleSwitchNetwork}
-                      className="px-6 py-3 bg-primary-light text-black rounded-lg font-semibold hover:bg-primary-lighter transition-colors"
-                    >
-                      Switch Network
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowNetworkPrompt(false);
-                        setAuthenticationStep('select');
-                        setSelectedWallet(null);
-                      }}
-                      className="px-6 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </GlassPanel>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* NFT Error */}
       <AnimatePresence>
@@ -306,7 +264,7 @@ export const WalletConnect: React.FC<WalletConnectProps> = ({ onAuthenticated })
 
       {/* Error Display */}
       <AnimatePresence>
-        {error && authenticationStep === 'error' && !showNFTError && !showNetworkPrompt && (
+        {error && authenticationStep === 'error' && !showNFTError && (
           <motion.div
             className="fixed bottom-8 right-8 z-50"
             initial={{ opacity: 0, x: 100 }}

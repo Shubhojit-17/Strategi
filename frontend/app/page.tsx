@@ -1,5 +1,7 @@
-import MainLayout from '@/components/layout/MainLayout';
+'use client';
+
+import { RadialDashboard } from '@/components/home/RadialDashboard';
 
 export default function Home() {
-  return <MainLayout />;
+  return <RadialDashboard />;
 }

@@ -1,207 +1,195 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Sphere } from '@react-three/drei';
+import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import GlassPanel from '../ui/GlassPanel';
-import NeonText from '../ui/NeonText';
+import AnimatedButton from '../ui/AnimatedButton';
 
-// Dynamically import Canvas to avoid SSR issues
-const Canvas = dynamic(() => import('@react-three/fiber').then(mod => mod.Canvas), { ssr: false });
-const OrbitControls = dynamic(() => import('@react-three/drei').then(mod => mod.OrbitControls), { ssr: false });
-const PerspectiveCamera = dynamic(() => import('@react-three/drei').then(mod => mod.PerspectiveCamera), { ssr: false });
-const Environment = dynamic(() => import('@react-three/drei').then(mod => mod.Environment), { ssr: false });
-
-const FloatingNode = dynamic(() => import('./FloatingNode').then(mod => ({ default: mod.FloatingNode })), { ssr: false });
-const NodeConnector = dynamic(() => import('./NodeConnector').then(mod => ({ default: mod.NodeConnector })), { ssr: false });
+const BackgroundParticles = () => {
+  return (
+    <>
+      {Array.from({ length: 40 }).map((_, i) => (
+        <Sphere
+          key={i}
+          args={[0.05, 16, 16]}
+          position={[
+            (Math.random() - 0.5) * 15,
+            (Math.random() - 0.5) * 15,
+            (Math.random() - 0.5) * 15,
+          ]}
+        >
+          <meshStandardMaterial
+            color={Math.random() > 0.5 ? '#3CF2FF' : '#82FFD2'}
+            emissive={Math.random() > 0.5 ? '#3CF2FF' : '#82FFD2'}
+            emissiveIntensity={0.5}
+          />
+        </Sphere>
+      ))}
+    </>
+  );
+};
 
 interface WalletGatewayProps {
-  onWalletSelect: (type: 'metamask' | 'crossmint') => void;
+  onWalletSelect: (wallet: 'metamask' | 'crossmint') => void;
   selectedWallet?: 'metamask' | 'crossmint' | null;
   isConnecting?: boolean;
+  onClose?: () => void;
 }
 
-export const WalletGateway: React.FC<WalletGatewayProps> = ({
-  onWalletSelect,
-  selectedWallet = null,
+export const WalletGateway: React.FC<WalletGatewayProps> = ({ 
+  onWalletSelect, 
+  selectedWallet = null, 
   isConnecting = false,
+  onClose 
 }) => {
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
-  // Fix hydration - only render 3D after mount
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const metamaskNode = {
-    position: [-3, 0, 0] as [number, number, number],
-    color: '#f6851b',
-    icon: '🦊',
-    label: 'MetaMask',
-    type: 'metamask' as const,
-  };
-
-  const crossmintNode = {
-    position: [3, 0, 0] as [number, number, number],
-    color: '#00d4ff',
-    icon: '✉️',
-    label: 'Crossmint',
-    type: 'crossmint' as const,
-  };
-
-  const handleNodeClick = (type: 'metamask' | 'crossmint') => {
-    if (!isConnecting) {
-      onWalletSelect(type);
+  const handleBack = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      router.push('/');
     }
   };
 
+  if (!mounted) return null;
+
   return (
-    <div className="relative w-full h-screen bg-linear-to-b from-black via-primary-darker to-black overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-5" />
-      <div className="absolute inset-0 bg-gradient-radial from-primary-dark/20 via-transparent to-transparent" />
-      
-      {/* Header */}
-      <div className="absolute top-8 left-0 right-0 z-10 flex flex-col items-center gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <NeonText className="text-4xl md:text-5xl font-bold">
-            Connect Your Wallet
-          </NeonText>
-        </motion.div>
-        
-        <motion.p
-          className="text-gray-300 text-lg max-w-2xl text-center px-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-        >
-          Choose your preferred method to access the AI-powered document system
-        </motion.p>
+    <div className="relative w-full h-screen overflow-hidden bg-deep-space-blue">
+      <div className="absolute inset-0 -z-10">
+        <Canvas>
+          <PerspectiveCamera makeDefault position={[0, 0, 12]} />
+          <OrbitControls 
+            enableZoom={false} 
+            enablePan={false} 
+            autoRotate 
+            autoRotateSpeed={0.2} 
+          />
+          <ambientLight intensity={0.3} />
+          <pointLight position={[10, 10, 10]} intensity={0.8} color="#3CF2FF" />
+          <pointLight position={[-10, -10, -10]} intensity={0.5} color="#A37CFF" />
+          <BackgroundParticles />
+        </Canvas>
       </div>
 
-      {/* 3D Scene - Only render after mount */}
-      {mounted && (
-        <div className="absolute inset-0">
-          <Canvas>
-            <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={50} />
-            
-            {/* Lighting */}
-            <ambientLight intensity={0.3} />
-            <pointLight position={[10, 10, 10]} intensity={0.8} />
-            <pointLight position={[-10, -10, -10]} intensity={0.5} color="#00ffff" />
-            <spotLight
-              position={[0, 10, 0]}
-              angle={0.3}
-              penumbra={1}
-              intensity={0.5}
-            castShadow
-          />
+      <motion.div 
+        className="absolute top-8 left-8 z-50"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <AnimatedButton onClick={handleBack} variant="ghost">
+          ← Back
+        </AnimatedButton>
+      </motion.div>
 
-          {/* Environment */}
-          <Environment preset="night" />
+      <div className="relative z-10 w-full h-full flex items-center justify-center">
+        <div className="w-full max-w-4xl px-8">
+          <motion.div 
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-12 text-center"
+          >
+            <h1 className="text-4xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-primary-light via-accent to-primary-light">
+              Connect Your Wallet
+            </h1>
+            <p className="text-gray-300 text-lg">
+              Choose your preferred wallet to access the platform
+            </p>
+          </motion.div>
 
-          {/* Floating Nodes */}
-          <FloatingNode
-            {...metamaskNode}
-            onClick={() => handleNodeClick('metamask')}
-            isSelected={selectedWallet === 'metamask'}
-            isActive={!isConnecting}
-          />
-          
-          <FloatingNode
-            {...crossmintNode}
-            onClick={() => handleNodeClick('crossmint')}
-            isSelected={selectedWallet === 'crossmint'}
-            isActive={false} // Crossmint coming soon
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <button
+                onClick={() => !isConnecting && onWalletSelect('metamask')}
+                disabled={isConnecting}
+                className={`w-full glass-panel p-8 rounded-2xl transition-all duration-300 ${
+                  isConnecting && selectedWallet === 'metamask'
+                    ? 'border-primary-light cursor-not-allowed'
+                    : isConnecting
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:border-primary-light hover:scale-105 cursor-pointer'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-4">
+                  <div className="text-6xl mb-2">🦊</div>
+                  <h3 className="text-2xl font-bold text-white">MetaMask</h3>
+                  <p className="text-gray-400 text-sm text-center">
+                    Connect using MetaMask browser extension
+                  </p>
+                  {isConnecting && selectedWallet === 'metamask' && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex items-center gap-2 text-primary-light"
+                    >
+                      <div className="w-4 h-4 border-2 border-primary-light border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Connecting...</span>
+                    </motion.div>
+                  )}
+                </div>
+              </button>
+            </motion.div>
 
-          {/* Connection line between nodes */}
-          <NodeConnector
-            start={metamaskNode.position}
-            end={crossmintNode.position}
-            color="#00ffff"
-            isActive={selectedWallet !== null}
-          />
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <button 
+                disabled 
+                className="w-full glass-panel p-8 rounded-2xl opacity-50 cursor-not-allowed"
+              >
+                <div className="flex flex-col items-center gap-4">
+                  <div className="text-6xl mb-2">✉️</div>
+                  <h3 className="text-2xl font-bold text-white">Crossmint</h3>
+                  <p className="text-gray-400 text-sm text-center">
+                    Email-based wallet
+                  </p>
+                  <span className="text-xs text-accent mt-2">Coming Soon</span>
+                </div>
+              </button>
+            </motion.div>
+          </div>
 
-          {/* Interactive camera controls */}
-          <OrbitControls
-            enableZoom={false}
-            enablePan={false}
-            maxPolarAngle={Math.PI / 2}
-            minPolarAngle={Math.PI / 2}
-            autoRotate={!selectedWallet}
-            autoRotateSpeed={0.5}
-          />
-        </Canvas>
-        </div>
-      )}
-
-      {/* Connection Status Panel */}
-      <AnimatePresence>
-        {isConnecting && (
-          <motion.div
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10"
+          <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
+            transition={{ delay: 0.5 }}
+            className="mt-12 max-w-2xl mx-auto"
           >
-            <GlassPanel className="px-8 py-4">
-              <div className="flex items-center gap-4">
-                <div className="w-6 h-6 border-2 border-primary-light border-t-transparent rounded-full animate-spin" />
-                <span className="text-primary-light font-medium">
-                  Connecting to {selectedWallet === 'metamask' ? 'MetaMask' : 'Crossmint'}...
-                </span>
+            <GlassPanel className="p-6">
+              <div className="flex items-start gap-4">
+                <span className="text-3xl">ℹ️</span>
+                <div>
+                  <h4 className="text-white font-semibold mb-2">
+                    Important Information
+                  </h4>
+                  <ul className="text-sm text-gray-400 space-y-1">
+                    <li>• You need to connect to the Somnia network</li>
+                    <li>• An NFT is required to access the platform</li>
+                    <li>• If you don't have an NFT, you can mint one after connecting</li>
+                  </ul>
+                </div>
               </div>
             </GlassPanel>
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Instructions */}
-      <motion.div
-        className="absolute bottom-8 left-8 z-10"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
-      >
-        <GlassPanel className="px-6 py-4 max-w-sm">
-          <h3 className="text-primary-light font-semibold mb-2">Getting Started</h3>
-          <ul className="text-sm text-gray-300 space-y-1">
-            <li>• Click on a node to connect</li>
-            <li>• You'll need an NFT to access the system</li>
-            <li>• Somnia network required</li>
-          </ul>
-        </GlassPanel>
-      </motion.div>
-
-      {/* Particles background effect */}
-      <div className="absolute inset-0 pointer-events-none">
-        {Array.from({ length: 50 }).map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-primary-light/30 rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [0, -20, 0],
-              opacity: [0.3, 0.7, 0.3],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
+        </div>
       </div>
+
+      <div className="fixed inset-0 -z-20 bg-gradient-to-br from-deep-space-blue via-[#1B2138] to-deep-space-blue" />
     </div>
   );
 };

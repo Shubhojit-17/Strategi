@@ -2,119 +2,110 @@
 
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { StrategiLogoAnimated } from '@/components/branding/StrategiLogoAnimated';
 
 interface EntryAnimationProps {
   onComplete: () => void;
 }
 
 export default function EntryAnimation({ onComplete }: EntryAnimationProps) {
-  const [showCircle, setShowCircle] = useState(true);
+  const [phase, setPhase] = useState<'appear' | 'hold' | 'exit'>('appear');
 
   useEffect(() => {
-    // Complete animation after circle trace finishes
-    const timer = setTimeout(() => {
-      setShowCircle(false);
-      onComplete();
+    // Phase 1: Logo appears and rotates in (1s)
+    // Phase 2: Hold and breathe (1.5s)
+    // Phase 3: Exit animation (0.8s)
+    
+    const holdTimer = setTimeout(() => {
+      setPhase('hold');
+    }, 1000);
+
+    const exitTimer = setTimeout(() => {
+      setPhase('exit');
     }, 2500);
 
-    return () => clearTimeout(timer);
-  }, [onComplete]);
+    const completeTimer = setTimeout(() => {
+      onComplete();
+    }, 3300);
 
-  const circleRadius = 100;
-  const circumference = 2 * Math.PI * circleRadius;
+    return () => {
+      clearTimeout(holdTimer);
+      clearTimeout(exitTimer);
+      clearTimeout(completeTimer);
+    };
+  }, [onComplete]);
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-deep-space-blue"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
+      style={{
+        background: 'radial-gradient(circle at center, #0F1423, #000000)',
+      }}
       initial={{ opacity: 1 }}
-      animate={{ opacity: showCircle ? 1 : 0 }}
-      transition={{ duration: 0.8, delay: 2.5 }}
+      animate={{ opacity: phase === 'exit' ? 0 : 1 }}
+      transition={{ duration: 0.8 }}
     >
-      {/* SVG Circle Tracing Animation */}
-      <svg width="240" height="240" viewBox="0 0 240 240">
-        {/* Background circle */}
-        <circle
-          cx="120"
-          cy="120"
-          r={circleRadius}
-          fill="none"
-          stroke="rgba(60, 242, 255, 0.1)"
-          strokeWidth="2"
-        />
-        
-        {/* Animated tracing circle */}
-        <motion.circle
-          cx="120"
-          cy="120"
-          r={circleRadius}
-          fill="none"
-          stroke="url(#neonGradient)"
-          strokeWidth="3"
-          strokeLinecap="round"
-          initial={{ 
-            strokeDasharray: circumference,
-            strokeDashoffset: circumference,
-            opacity: 0 
-          }}
-          animate={{ 
-            strokeDashoffset: 0,
-            opacity: 1 
-          }}
-          transition={{ 
-            duration: 2,
-            ease: "easeInOut",
-            opacity: { duration: 0.3 }
-          }}
-        />
-
-        {/* Gradient definition */}
-        <defs>
-          <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#3CF2FF" />
-            <stop offset="50%" stopColor="#A37CFF" />
-            <stop offset="100%" stopColor="#FF7AC3" />
-          </linearGradient>
-        </defs>
-      </svg>
-
-      {/* Center text */}
+      {/* Animated logo entrance */}
       <motion.div
-        className="absolute text-center"
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.5, duration: 0.8 }}
+        initial={{ scale: 0.3, rotate: -180, opacity: 0 }}
+        animate={{
+          scale: phase === 'exit' ? 2.5 : 1,
+          rotate: phase === 'exit' ? 180 : 0,
+          opacity: phase === 'exit' ? 0 : 1,
+        }}
+        transition={{
+          duration: phase === 'appear' ? 1 : 0.8,
+          ease: phase === 'appear' ? [0.34, 1.56, 0.64, 1] : 'easeInOut',
+        }}
       >
-        <h1 className="text-4xl font-bold neon-glow mb-2">Strategi</h1>
-        <p className="text-neon-aqua/60 text-sm">Initializing AI Consciousness</p>
+        <StrategiLogoAnimated size={140} />
       </motion.div>
 
-      {/* Particle dots around circle */}
-      {[...Array(8)].map((_, i) => {
-        const angle = (i / 8) * Math.PI * 2;
-        const x = 120 + Math.cos(angle) * (circleRadius + 20);
-        const y = 120 + Math.sin(angle) * (circleRadius + 20);
-        
-        return (
+      {/* Expanding ring on exit */}
+      {phase === 'exit' && (
+        <motion.div
+          className="absolute inset-0 flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
           <motion.div
-            key={i}
-            className="absolute w-2 h-2 rounded-full bg-neon-aqua"
-            style={{ 
-              left: `calc(50% - ${240/2}px + ${x}px - 4px)`, 
-              top: `calc(50% - ${240/2}px + ${y}px - 4px)` 
+            className="rounded-full border-2"
+            style={{
+              borderColor: '#3CF2FF',
+              boxShadow: '0 0 30px #3CF2FF80',
             }}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ 
-              scale: [0, 1.5, 1],
-              opacity: [0, 1, 0.7]
-            }}
-            transition={{
-              delay: 0.8 + (i * 0.1),
-              duration: 0.6,
-              ease: "easeOut"
-            }}
+            initial={{ width: 140, height: 140, opacity: 1 }}
+            animate={{ width: 2000, height: 2000, opacity: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
           />
-        );
-      })}
+        </motion.div>
+      )}
+
+      {/* Particle burst on exit */}
+      {phase === 'exit' && (
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 24 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-2 h-2 rounded-full"
+              style={{
+                background: i % 3 === 0 ? '#3CF2FF' : i % 3 === 1 ? '#82FFD2' : '#A37CFF',
+                boxShadow: `0 0 8px ${i % 3 === 0 ? '#3CF2FF' : i % 3 === 1 ? '#82FFD2' : '#A37CFF'}`,
+                left: '50%',
+                top: '50%',
+              }}
+              initial={{ x: 0, y: 0, opacity: 1, scale: 0 }}
+              animate={{
+                x: Math.cos((i / 24) * Math.PI * 2) * 400,
+                y: Math.sin((i / 24) * Math.PI * 2) * 400,
+                opacity: 0,
+                scale: 1,
+              }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+            />
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }

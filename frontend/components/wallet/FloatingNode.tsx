@@ -1,188 +1,171 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Sphere, Html } from '@react-three/drei';
-import * as THREE from 'three';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface FloatingNodeProps {
-  position: [number, number, number];
-  color: string;
   icon: string;
   label: string;
   onClick?: () => void;
-  isSelected?: boolean;
-  isActive?: boolean;
+  isLoading?: boolean;
+  isDisabled?: boolean;
 }
 
-export const FloatingNode: React.FC<FloatingNodeProps> = ({
-  position,
-  color,
+const FloatingNode: React.FC<FloatingNodeProps> = ({
   icon,
   label,
   onClick,
-  isSelected = false,
-  isActive = true,
+  isLoading = false,
+  isDisabled = false,
 }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const glowRef = useRef<THREE.Mesh>(null);
-  const outerGlowRef = useRef<THREE.Mesh>(null);
-  const [hovered, setHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
-  // Pulse animation
-  useFrame((state) => {
-    if (!meshRef.current || !glowRef.current || !outerGlowRef.current) return;
-
-    const time = state.clock.getElapsedTime();
-    
-    // Base pulse: subtle breathing effect
-    const basePulse = Math.sin(time * 1.5) * 0.05 + 1.0;
-    
-    // Hover pulse: more pronounced when hovered
-    const hoverPulse = hovered ? Math.sin(time * 3) * 0.1 + 1.1 : 1.0;
-    
-    // Selected pulse: constant glow when selected
-    const selectedPulse = isSelected ? Math.sin(time * 2) * 0.15 + 1.15 : 1.0;
-    
-    // Combine pulses
-    const finalPulse = basePulse * hoverPulse * selectedPulse;
-    
-    meshRef.current.scale.setScalar(finalPulse);
-    glowRef.current.scale.setScalar(finalPulse * 1.08);
-    outerGlowRef.current.scale.setScalar(finalPulse * 1.2);
-    
-    // Rotate slowly
-    meshRef.current.rotation.y += 0.005;
-    meshRef.current.rotation.x = Math.sin(time * 0.5) * 0.1;
-    
-    // Glow intensity
-    const material = glowRef.current.material as THREE.MeshBasicMaterial;
-    material.opacity = (Math.sin(time * 2) * 0.1 + 0.3) * (hovered ? 1.5 : 1.0);
-    
-    const outerMaterial = outerGlowRef.current.material as THREE.MeshBasicMaterial;
-    outerMaterial.opacity = (Math.sin(time * 1.5) * 0.05 + 0.15) * (hovered ? 2.0 : 1.0);
-  });
-
-  const handlePointerOver = () => {
-    if (isActive) {
-      setHovered(true);
-      document.body.style.cursor = 'pointer';
-    }
-  };
-
-  const handlePointerOut = () => {
-    setHovered(false);
-    document.body.style.cursor = 'auto';
-  };
-
-  const handleClick = () => {
-    if (isActive && onClick) {
-      onClick();
-    }
-  };
+  // CSS variables for bioluminescent theme
+  const coreGlow = '#3CF2FF';
+  const plasmaAccent = '#82FFD2';
+  const deepOcean = '#0F1423';
+  const biolightPurple = '#A37CFF';
 
   return (
-    <group position={position}>
-      {/* Outer glow layer */}
-      <Sphere ref={outerGlowRef} args={[1.2, 32, 32]}>
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0.15}
-          side={THREE.BackSide}
-        />
-      </Sphere>
-
-      {/* Glow layer */}
-      <Sphere ref={glowRef} args={[1.08, 32, 32]}>
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0.3}
-          side={THREE.BackSide}
-        />
-      </Sphere>
-
-      {/* Main sphere */}
-      <Sphere
-        ref={meshRef}
-        args={[1, 64, 64]}
-        onPointerOver={handlePointerOver}
-        onPointerOut={handlePointerOut}
-        onClick={handleClick}
-      >
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={hovered ? 0.8 : 0.4}
-          metalness={0.9}
-          roughness={0.1}
-          transparent
-          opacity={isActive ? 1.0 : 0.5}
-        />
-      </Sphere>
-
-      {/* HTML Label */}
-      <Html
-        position={[0, -1.8, 0]}
-        center
-        distanceFactor={8}
+    <motion.div
+      className="relative"
+      initial={{ opacity: 0, scale: 0.5 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+    >
+      {/* Animated floating effect */}
+      <motion.div
+        animate={{
+          y: [0, -8, 0],
+        }}
+        transition={{
+          duration: isHovered ? 3 : 4,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={onClick}
+        className="relative w-32 h-32 cursor-pointer"
         style={{
-          pointerEvents: 'none',
-          userSelect: 'none',
+          pointerEvents: isDisabled ? 'none' : 'auto',
+          opacity: isDisabled ? 0.5 : 1,
         }}
       >
+        {/* Outer glow ring */}
         <motion.div
-          className="flex flex-col items-center gap-2"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          className="absolute inset-0 rounded-full"
+          animate={{
+            boxShadow: isHovered
+              ? `0 0 40px ${coreGlow}, 0 0 60px ${plasmaAccent}, inset 0 0 20px ${biolightPurple}`
+              : `0 0 20px ${coreGlow}, 0 0 40px ${plasmaAccent}`,
+          }}
+          transition={{ duration: 0.3 }}
+          style={{
+            background: `radial-gradient(circle at 30% 30%, ${plasmaAccent}20, ${deepOcean})`,
+            border: `2px solid ${coreGlow}`,
+            backdropFilter: 'blur(8px)',
+          }}
+        />
+
+        {/* Middle glass layer */}
+        <motion.div
+          className="absolute inset-1 rounded-full pointer-events-none"
+          animate={{
+            opacity: isHovered ? 0.8 : 0.5,
+            scale: isHovered ? 1.05 : 1,
+          }}
+          transition={{ duration: 0.3 }}
+          style={{
+            background: `linear-gradient(135deg, ${plasmaAccent}30, ${biolightPurple}20)`,
+            border: `1px solid ${plasmaAccent}`,
+            boxShadow: `inset 0 1px 10px ${coreGlow}40`,
+          }}
+        />
+
+        {/* Inner core */}
+        <motion.div
+          className="absolute inset-3 rounded-full flex items-center justify-center"
+          animate={{
+            scale: isHovered ? 1.1 : 1,
+            boxShadow: isHovered
+              ? `0 0 20px ${coreGlow}, inset 0 0 15px ${plasmaAccent}`
+              : `0 0 10px ${coreGlow}, inset 0 0 10px ${plasmaAccent}40`,
+          }}
+          transition={{ duration: 0.3 }}
+          style={{
+            background: `radial-gradient(circle, ${coreGlow}20, ${deepOcean}80)`,
+            border: `1px solid ${coreGlow}`,
+          }}
         >
-          <div className="text-4xl mb-1">{icon}</div>
-          <div
-            className="text-base font-medium tracking-wide"
-            style={{
-              color: hovered ? color : '#ffffff',
-              textShadow: `0 0 ${hovered ? '12px' : '8px'} ${color}`,
-              transition: 'all 0.3s ease',
+          {/* Icon */}
+          <motion.div
+            className="text-5xl"
+            animate={{
+              scale: isLoading ? [1, 1.1, 1] : isHovered ? 1.2 : 1,
+              rotate: isLoading ? 360 : 0,
+            }}
+            transition={{
+              scale: { duration: 0.3 },
+              rotate: {
+                duration: 2,
+                repeat: isLoading ? Infinity : 0,
+                ease: 'linear',
+              },
             }}
           >
-            {label}
-          </div>
-          {isSelected && (
-            <motion.div
-              className="text-xs text-cyan-300"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              ✓ Connected
-            </motion.div>
-          )}
-          {!isActive && (
-            <div className="text-xs text-gray-500">Coming Soon</div>
-          )}
+            {icon}
+          </motion.div>
         </motion.div>
-      </Html>
 
-      {/* Particle ring effect when hovered */}
-      {hovered && (
-        <group>
-          {Array.from({ length: 12 }).map((_, i) => {
-            const angle = (i / 12) * Math.PI * 2;
-            const radius = 1.5;
-            const x = Math.cos(angle) * radius;
-            const z = Math.sin(angle) * radius;
-            
-            return (
-              <Sphere key={i} args={[0.02, 8, 8]} position={[x, 0, z]}>
-                <meshBasicMaterial color={color} />
-              </Sphere>
-            );
-          })}
-        </group>
-      )}
-    </group>
+        {/* Pulse ripple on hover */}
+        {isHovered && (
+          <motion.div
+            className="absolute inset-0 rounded-full"
+            initial={{ scale: 1, opacity: 1 }}
+            animate={{ scale: 1.3, opacity: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            style={{
+              border: `2px solid ${plasmaAccent}`,
+              boxShadow: `0 0 15px ${plasmaAccent}`,
+            }}
+          />
+        )}
+      </motion.div>
+
+      {/* Label below node */}
+      <motion.div
+        className="text-center mt-4"
+        initial={{ opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+      >
+        <div
+          className="text-sm font-semibold tracking-wide"
+          style={{
+            color: isHovered ? coreGlow : plasmaAccent,
+            textShadow: isHovered
+              ? `0 0 10px ${coreGlow}, 0 0 5px ${plasmaAccent}`
+              : `0 0 5px ${coreGlow}`,
+            transition: 'all 0.3s ease',
+          }}
+        >
+          {label}
+        </div>
+
+        {isLoading && (
+          <motion.div
+            className="text-xs mt-1"
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            style={{ color: plasmaAccent }}
+          >
+            Connecting...
+          </motion.div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 };
+
+export default FloatingNode;

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { User, BrainElectricity, Check, Copy } from 'iconoir-react';
 
 interface Message {
   id: string;
@@ -84,13 +85,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     >
       {/* Avatar */}
       <div
-        className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-lg ${
+        className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${
           isUser
-            ? 'bg-gradient-to-br from-primary-light/30 to-primary-light/10 border border-primary-light/40'
-            : 'bg-gradient-to-br from-accent/30 to-accent/10 border border-accent/40'
+            ? 'bg-gradient-to-br from-primary-light/30 to-primary-light/10 border border-primary-light/40 text-primary-light'
+            : 'bg-gradient-to-br from-accent/30 to-accent/10 border border-accent/40 text-accent'
         }`}
       >
-        {isUser ? '👤' : '🤖'}
+        {isUser ? <User className="w-6 h-6" /> : <BrainElectricity className="w-6 h-6" />}
       </div>
 
       {/* Message content */}
@@ -124,9 +125,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 title="Copy message"
               >
                 {copied ? (
-                  <span className="text-xs">✓</span>
+                  <Check className="w-3 h-3" />
                 ) : (
-                  <span className="text-xs">📋</span>
+                  <Copy className="w-3 h-3" />
                 )}
               </button>
             </div>

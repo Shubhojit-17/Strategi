@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import GlassPanel from '../ui/GlassPanel';
 import { ProgressBar } from '../ui/Loading';
+import { BookStack, Page, EditPencil, FileNotFound, Check, WarningCircle } from 'iconoir-react';
 
 interface FileCardProps {
   file: File;
@@ -14,20 +15,20 @@ interface FileCardProps {
   onRemove?: () => void;
 }
 
-const getFileIcon = (fileName: string): string => {
+const getFileIcon = (fileName: string): React.ComponentType<{ className?: string }> => {
   const extension = fileName.split('.').pop()?.toLowerCase();
   switch (extension) {
     case 'pdf':
-      return '📕';
+      return BookStack;
     case 'doc':
     case 'docx':
-      return '📘';
+      return Page;
     case 'txt':
-      return '📝';
+      return EditPencil;
     case 'md':
-      return '📄';
+      return FileNotFound;
     default:
-      return '📄';
+      return FileNotFound;
   }
 };
 
@@ -63,11 +64,11 @@ export const FileCard: React.FC<FileCardProps> = ({
   const getStatusIcon = () => {
     switch (status) {
       case 'uploading':
-        return '⏳';
+        return <span className="animate-spin">⏳</span>;
       case 'success':
-        return '✅';
+        return <Check className="w-5 h-5 text-green-400" />;
       case 'error':
-        return '❌';
+        return <WarningCircle className="w-5 h-5 text-red-400" />;
       default:
         return null;
     }
@@ -83,8 +84,8 @@ export const FileCard: React.FC<FileCardProps> = ({
       <GlassPanel className={`p-4 border ${getStatusColor()} transition-all`}>
         <div className="flex items-start gap-4">
           {/* File icon */}
-          <div className="text-4xl shrink-0">
-            {getFileIcon(file.name)}
+          <div className="shrink-0 text-cyan-400">
+            {React.createElement(getFileIcon(file.name), { className: 'w-10 h-10' })}
           </div>
 
           {/* File info */}

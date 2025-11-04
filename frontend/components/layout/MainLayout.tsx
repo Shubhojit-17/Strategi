@@ -39,11 +39,23 @@ const StatusBadge = ({ status }: { status: 'completed' | 'active' | 'locked' }) 
 
 export default function MainLayout() {
   const router = useRouter();
-  const [showEntry, setShowEntry] = useState(true);
+  const [showEntry, setShowEntry] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const wallet = useAppStore((state) => state.wallet);
   const documents = useAppStore((state) => state.documents);
+
+  // Check if user has seen the entry animation before
+  useEffect(() => {
+    const hasSeenEntry = sessionStorage.getItem('hasSeenEntryAnimation');
+    if (hasSeenEntry) {
+      // Skip animations and go straight to dashboard
+      setShowDashboard(true);
+    } else {
+      // Show entry animation for first-time visit
+      setShowEntry(true);
+    }
+  }, []);
 
   const handleEntryComplete = () => {
     setShowEntry(false);
@@ -53,17 +65,9 @@ export default function MainLayout() {
   const handleTransitionComplete = () => {
     setShowTransition(false);
     setShowDashboard(true);
+    // Mark that user has seen the entry animation
+    sessionStorage.setItem('hasSeenEntryAnimation', 'true');
   };
-
-  // Check wallet connection and redirect accordingly
-  useEffect(() => {
-    if (showDashboard) {
-      // If wallet is not connected, redirect to wallet connection
-      if (!wallet.address) {
-        router.push('/wallet');
-      }
-    }
-  }, [showDashboard, wallet.address, router]);
 
   // Determine card statuses
   const isWalletConnected = !!wallet.address;
@@ -92,6 +96,28 @@ export default function MainLayout() {
             transition={{ duration: 0.8 }}
             className="w-full h-full relative overflow-hidden flex flex-col items-center justify-center"
           >
+            {/* Back Button */}
+            <motion.button
+              onClick={() => {
+                sessionStorage.removeItem('hasSeenEntryAnimation');
+                window.location.reload();
+              }}
+              whileHover={{ scale: 1.1, x: -5 }}
+              whileTap={{ scale: 0.95 }}
+              className="absolute top-8 left-8 flex items-center gap-2 px-4 py-2 glass-panel text-white hover:text-cyan-400 transition-colors"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                className="h-5 w-5" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span className="font-semibold">Back</span>
+            </motion.button>
+
             {/* Header */}
             <div className="text-center mb-16">
               <NeonText className="text-6xl font-bold mb-4">Strategi</NeonText>

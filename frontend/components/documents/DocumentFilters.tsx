@@ -3,6 +3,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import GlassPanel from '../ui/GlassPanel';
+import { 
+  BookStack, 
+  Page, 
+  EditPencil, 
+  FileNotFound 
+} from 'iconoir-react';
 
 interface FilterOptions {
   fileTypes: string[];
@@ -16,10 +22,10 @@ interface DocumentFiltersProps {
 }
 
 const FILE_TYPE_OPTIONS = [
-  { value: 'pdf', label: 'PDF', icon: '📕' },
-  { value: 'doc', label: 'Word', icon: '📘' },
-  { value: 'text', label: 'Text', icon: '📝' },
-  { value: 'markdown', label: 'Markdown', icon: '📄' },
+  { value: 'pdf', label: 'PDF', icon: BookStack },
+  { value: 'doc', label: 'Word', icon: Page },
+  { value: 'text', label: 'Text', icon: EditPencil },
+  { value: 'markdown', label: 'Markdown', icon: FileNotFound },
 ];
 
 const DATE_RANGE_OPTIONS = [
@@ -100,7 +106,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
                   onChange={() => handleFileTypeToggle(option.value)}
                   className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-primary-light focus:ring-primary-light focus:ring-offset-0"
                 />
-                <span className="text-xl">{option.icon}</span>
+                <option.icon className="w-5 h-5 text-cyan-400" />
                 <span className="text-sm text-gray-300 group-hover:text-white transition-colors">
                   {option.label}
                 </span>

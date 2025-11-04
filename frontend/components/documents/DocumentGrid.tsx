@@ -64,7 +64,7 @@ const EmptyState: React.FC = () => (
       </p>
       <a
         href="/upload"
-        className="inline-block py-3 px-6 rounded-lg bg-linear-to-r from-primary-light to-accent text-white font-semibold hover:scale-105 transition-transform"
+        className="inline-block py-3 px-6 rounded-lg bg-gradient-to-r from-primary-light to-accent text-white font-semibold hover:scale-105 transition-transform"
       >
         Upload Document
       </a>

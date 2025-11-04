@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import GlassPanel from '../ui/GlassPanel';
 import AnimatedButton from '../ui/AnimatedButton';
+import { BookStack, Page, EditPencil, ClipboardCheck, FileNotFound, Eye, Trash } from 'iconoir-react';
 
 interface DocumentCardProps {
   id: number;
@@ -18,13 +19,13 @@ interface DocumentCardProps {
   onExecute?: (id: number) => void;
 }
 
-const getFileIcon = (filename: string): string => {
+const getFileIcon = (filename: string): React.ComponentType<{ className?: string }> => {
   const ext = filename.split('.').pop()?.toLowerCase();
-  if (ext === 'pdf') return '📕';
-  if (ext === 'doc' || ext === 'docx') return '📘';
-  if (ext === 'txt') return '📝';
-  if (ext === 'md' || ext === 'markdown') return '📋';
-  return '📄';
+  if (ext === 'pdf') return BookStack;
+  if (ext === 'doc' || ext === 'docx') return Page;
+  if (ext === 'txt') return EditPencil;
+  if (ext === 'md' || ext === 'markdown') return ClipboardCheck;
+  return FileNotFound;
 };
 
 const formatDate = (timestamp: number): string => {
@@ -79,8 +80,10 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     >
       <GlassPanel className="p-6 h-full hover:border-primary-light/50 transition-all">
         {/* File Icon */}
-        <div className="text-5xl mb-4 text-center">
-          {getFileIcon(filename)}
+        <div className="mb-4 text-center flex justify-center">
+          <div className="text-cyan-400">
+            {React.createElement(getFileIcon(filename), { className: 'w-12 h-12' })}
+          </div>
         </div>
 
         {/* File Info */}
@@ -113,10 +116,10 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             {onView && (
               <button
                 onClick={() => onView(cid)}
-                className="flex-1 py-2 px-3 text-sm rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-all border border-gray-700 hover:border-primary-light/50"
+                className="flex-1 py-2 px-3 text-sm rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-all border border-gray-700 hover:border-primary-light/50 flex items-center justify-center gap-1"
                 title="View on IPFS"
               >
-                <span className="mr-1">👁️</span>
+                <Eye className="w-4 h-4" />
                 View
               </button>
             )}
@@ -125,17 +128,17 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
               <button
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-400 hover:text-red-300 transition-all border border-red-900/50 hover:border-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-400 hover:text-red-300 transition-all border border-red-900/50 hover:border-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                 title="Delete document"
               >
                 {isDeleting ? (
                   <>
-                    <span className="mr-1">⏳</span>
+                    <span className="animate-spin">⏳</span>
                     Deleting...
                   </>
                 ) : (
                   <>
-                    <span className="mr-1">🗑️</span>
+                    <Trash className="w-4 h-4" />
                     Delete
                   </>
                 )}

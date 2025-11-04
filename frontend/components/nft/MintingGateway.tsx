@@ -2,12 +2,35 @@
 
 import React from 'react';
 import { Canvas } from '@react-three/fiber';
-import { PerspectiveCamera, Environment, OrbitControls } from '@react-three/drei';
+import { PerspectiveCamera, OrbitControls, Sphere } from '@react-three/drei';
 import { motion } from 'framer-motion';
-import { MintingBubble } from './MintingBubble';
 import { MintPanel } from './MintPanel';
-import NeonText from '../ui/NeonText';
 import { useMint } from '@/lib/hooks/useMint';
+
+// Background particles component matching upload page
+const BackgroundParticles: React.FC = () => {
+  return (
+    <>
+      {Array.from({ length: 40 }).map((_, i) => (
+        <Sphere
+          key={i}
+          args={[0.05, 16, 16]}
+          position={[
+            (Math.random() - 0.5) * 15,
+            (Math.random() - 0.5) * 15,
+            (Math.random() - 0.5) * 15,
+          ]}
+        >
+          <meshStandardMaterial
+            color={Math.random() > 0.5 ? '#3CF2FF' : '#82FFD2'}
+            emissive={Math.random() > 0.5 ? '#3CF2FF' : '#82FFD2'}
+            emissiveIntensity={0.5}
+          />
+        </Sphere>
+      ))}
+    </>
+  );
+};
 
 interface MintingGatewayProps {
   onMintComplete?: (tokenId: number) => void;
@@ -42,33 +65,22 @@ export const MintingGateway: React.FC<MintingGatewayProps> = ({
   };
 
   return (
-    <div className="relative w-full min-h-screen bg-gradient-to-b from-black via-primary-darker to-black overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-5" />
-      <div className="absolute inset-0 bg-gradient-radial from-primary-dark/20 via-transparent to-transparent" />
-
-      {/* Animated background particles */}
-      <div className="absolute inset-0 pointer-events-none">
-        {Array.from({ length: 30 }).map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-primary-light/30 rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [0, -30, 0],
-              opacity: [0.3, 0.7, 0.3],
-              scale: [1, 1.5, 1],
-            }}
-            transition={{
-              duration: 4 + Math.random() * 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
+    <div className="relative w-full min-h-screen bg-deep-space-blue overflow-hidden">
+      {/* 3D Canvas Background */}
+      <div className="absolute inset-0 -z-10">
+        <Canvas>
+          <PerspectiveCamera makeDefault position={[0, 0, 12]} />
+          <OrbitControls 
+            enableZoom={false} 
+            enablePan={false} 
+            autoRotate 
+            autoRotateSpeed={0.2} 
           />
-        ))}
+          <ambientLight intensity={0.3} />
+          <pointLight position={[10, 10, 10]} intensity={0.8} color="#3CF2FF" />
+          <pointLight position={[-10, -10, -10]} intensity={0.5} color="#A37CFF" />
+          <BackgroundParticles />
+        </Canvas>
       </div>
 
       {/* Header */}
@@ -78,56 +90,20 @@ export const MintingGateway: React.FC<MintingGatewayProps> = ({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          <NeonText className="text-4xl md:text-5xl font-bold">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary-light via-accent to-primary-light bg-clip-text text-transparent">
             NFT Minting Portal
-          </NeonText>
+          </h1>
         </motion.div>
       </div>
 
-      {/* Main content layout */}
-      <div className="relative h-screen flex items-center justify-center gap-12 px-8">
-        {/* 3D Minting Bubble - Left side */}
+      {/* Main content layout - Centered */}
+      <div className="relative h-screen flex items-center justify-center px-8">
+        {/* Mint Panel - Centered */}
         <motion.div
-          className="flex-1 h-full max-w-2xl"
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
         >
-          <Canvas>
-            <PerspectiveCamera makeDefault position={[0, 0, 8]} fov={60} />
-
-            {/* Lighting */}
-            <ambientLight intensity={0.4} />
-            <pointLight position={[10, 10, 10]} intensity={1.0} />
-            <pointLight position={[-10, -10, -10]} intensity={0.6} color="#A37CFF" />
-            <spotLight
-              position={[0, 15, 0]}
-              angle={0.3}
-              penumbra={1}
-              intensity={0.8}
-              castShadow
-            />
-
-            {/* Environment */}
-            <Environment preset="night" />
-
-            {/* Minting Bubble */}
-            <MintingBubble state={mintState} progress={progress} />
-
-            {/* Camera controls */}
-            <OrbitControls
-              enableZoom={false}
-              enablePan={false}
-              autoRotate={mintState === 'idle' || mintState === 'success'}
-              autoRotateSpeed={mintState === 'success' ? 2.0 : 0.5}
-              maxPolarAngle={Math.PI / 1.5}
-              minPolarAngle={Math.PI / 3}
-            />
-          </Canvas>
-        </motion.div>
-
-        {/* Mint Panel - Right side */}
-        <div className="flex-shrink-0">
           <MintPanel
             state={mintState}
             price="0.01"
@@ -138,7 +114,7 @@ export const MintingGateway: React.FC<MintingGatewayProps> = ({
             onMint={handleMint}
             onClose={mintState === 'success' ? handleClose : undefined}
           />
-        </div>
+        </motion.div>
       </div>
 
       {/* Status messages */}
