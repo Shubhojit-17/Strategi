@@ -125,11 +125,11 @@ cd frontend && npm test
 
 ## 📝 License
 
-This project is developed for the DevTrack Hackathon.
+This project is developed for the Somnia AI Hackathon.
 
 ## 🏆 Hackathon Context
 
-This application was built for the DevTrack Hackathon, demonstrating:
+This application was built for the Somnia AI Hackathon, demonstrating:
 - Decentralized document management
 - AI integration with blockchain
 - Modern web development practices
