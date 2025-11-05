@@ -137,8 +137,29 @@ class AIAgent:
             )
             logger.info(f"Using Mistral 7B Instruct via OpenRouter with model {self.model} at {base_url}")
             
+        elif self.provider == "mai":
+            if not OPENAI_AVAILABLE:
+                raise ImportError("openai package not installed. Run: pip install openai")
+            
+            # Microsoft Mai-DS-R1 uses OpenAI-compatible API via OpenRouter
+            api_key = api_key or os.getenv("MAI_API_KEY")
+            base_url = os.getenv("MAI_BASE_URL", "https://openrouter.ai/api/v1")
+            
+            if not api_key:
+                raise ValueError("Mai API key not configured. Set MAI_API_KEY in .env")
+            
+            # Override model with Mai model if not specified
+            if not model:
+                self.model = os.getenv("MAI_MODEL", "microsoft/mai-ds-r1:free")
+            
+            self.client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url
+            )
+            logger.info(f"Using Microsoft Mai-DS-R1 via OpenRouter with model {self.model} at {base_url}")
+            
         else:
-            raise ValueError(f"Unknown AI provider: {self.provider}. Options: ollama, openai, moonshot, gemini, deepseek, mistral")
+            raise ValueError(f"Unknown AI provider: {self.provider}. Options: ollama, openai, moonshot, gemini, deepseek, mistral, mai")
     
     async def execute(
         self,
@@ -191,7 +212,7 @@ class AIAgent:
         # Route to appropriate provider
         if self.provider == "ollama":
             response_text = await self._execute_ollama(messages, max_tokens, temperature)
-        elif self.provider in ["openai", "moonshot", "deepseek", "mistral"]:
+        elif self.provider in ["openai", "moonshot", "deepseek", "mistral", "mai"]:
             response_text = await self._execute_openai_compatible(messages, max_tokens, temperature)
         elif self.provider == "gemini":
             response_text = await self._execute_gemini(prompt, context, max_tokens, temperature)

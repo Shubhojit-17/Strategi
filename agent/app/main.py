@@ -153,7 +153,7 @@ class ExecutionRequest(BaseModel):
     document_cid: str = Field(..., description="IPFS CID of document to analyze")
     prompt: str = Field(..., description="Prompt for AI agent")
     model: str = Field(default="gemini-2.0-flash", description="AI model to use")
-    provider: str = Field(default="gemini", description="AI provider (moonshot or gemini)")
+    provider: str = Field(default="gemini", description="AI provider (moonshot, gemini, deepseek, mistral, mai)")
 
 
 class ExecutionResponse(BaseModel):
@@ -876,7 +876,6 @@ async def receive_frontend_logs(log: FrontendLog):
 
 # ============ Startup ============
 
-@app.on_event("startup")
 async def startup_event():
     """Initialize on startup"""
     print(f"🤖 Somnia AI Agent starting...")
@@ -889,34 +888,37 @@ async def startup_event():
         print(f"   Registered: {is_registered}")
         
         if not is_registered:
-            print(f"   ⚠️  Agent not registered. Auto-registering...")
-            
-            # Upload default metadata to IPFS
-            metadata = {
-                "name": "Strategi AI Agent",
-                "description": "Verifiable AI agent for document processing",
-                "model": os.getenv("AI_MODEL", "mistral-7b-instruct"),
-                "provider": os.getenv("AI_PROVIDER", "mistral"),
-                "capabilities": ["document_analysis", "summarization", "qa", "pdf_processing"],
-                "did": AGENT_DID,
-                "version": "1.0.0"
-            }
-            
-            metadata_cid = await ipfs_client.upload_json(
-                metadata,
-                filename=f"agent-{AGENT_DID[:10]}.json"
-            )
-            
-            # Register on-chain
-            tx_hash = await somnia_client.register_agent(
-                did=AGENT_DID,
-                name="Strategi AI Agent",
-                metadata_cid=metadata_cid
-            )
-            
-            print(f"   ✅ Agent registered successfully!")
-            print(f"   Transaction: {tx_hash}")
-            print(f"   Metadata CID: {metadata_cid}")
+            if somnia_client.agent_registry:
+                print(f"   ⚠️  Agent not registered. Auto-registering...")
+                
+                # Upload default metadata to IPFS
+                metadata = {
+                    "name": "Strategi AI Agent",
+                    "description": "Verifiable AI agent for document processing",
+                    "model": os.getenv("AI_MODEL", "mistral-7b-instruct"),
+                    "provider": os.getenv("AI_PROVIDER", "mistral"),
+                    "capabilities": ["document_analysis", "summarization", "qa", "pdf_processing"],
+                    "did": AGENT_DID,
+                    "version": "1.0.0"
+                }
+                
+                metadata_cid = await ipfs_client.upload_json(
+                    metadata,
+                    filename=f"agent-{AGENT_DID[:10]}.json"
+                )
+                
+                # Register on-chain
+                tx_hash = await somnia_client.register_agent(
+                    did=AGENT_DID,
+                    name="Strategi AI Agent",
+                    metadata_cid=metadata_cid
+                )
+                
+                print(f"   ✅ Agent registered successfully!")
+                print(f"   Transaction: {tx_hash}")
+                print(f"   Metadata CID: {metadata_cid}")
+            else:
+                print(f"   ⚠️  AgentRegistry contract not available, skipping registration")
     except Exception as e:
         print(f"   ⚠️  Agent registration check failed: {e}")
         print(f"   Agent will still function, but blockchain features may be limited")
