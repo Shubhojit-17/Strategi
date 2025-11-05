@@ -1,4 +1,4 @@
-# StrategiFinal - AI-Powered Document Management on Blockchain
+# Strategi - AI-Powered Document Management on Blockchain
 
 A decentralized document management system that leverages AI for document processing, NFT-based authentication, and blockchain provenance tracking on the Somnia L1 network.
 
